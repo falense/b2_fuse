@@ -223,9 +223,7 @@ def load_config():
         
 
 class B2Fuse(Operations):
-    def __init__(self, root):
-        self.root = root
-        
+    def __init__(self):
         config = load_config()
         self.bucket = B2Bucket(config['accountId'], config['applicationKey'], config['bucketId'])  
           
@@ -465,8 +463,8 @@ class B2Fuse(Operations):
 
 
 
-def main(mountpoint, root):
-    FUSE(B2Fuse(root), mountpoint, nothreads=True, foreground=True)
+def main(mountpoint):
+    FUSE(B2Fuse(), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
-    main(sys.argv[2], sys.argv[1])
+    main(sys.argv[1])
