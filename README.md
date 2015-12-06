@@ -1,8 +1,8 @@
-# b2_fuse 
-
-## A filesystem implementation for Backblaze B2
+# b2_fuse - FUSE for Backblaze B2
  
 ### Version: 0.1
+
+#### Warning this software is BETA. It may destroy your bucket, you have been warned.
 
 Requires FUSE for python to work
 
