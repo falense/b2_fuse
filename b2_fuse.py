@@ -6,6 +6,8 @@ from collections import defaultdict
 import os
 import sys
 import errno
+#['E2BIG', 'EACCES', 'EADDRINUSE', 'EADDRNOTAVAIL', 'EADV', 'EAFNOSUPPORT', 'EAGAIN', 'EALREADY', 'EBADE', 'EBADF', 'EBADFD', 'EBADMSG', 'EBADR', 'EBADRQC', 'EBADSLT', 'EBFONT', 'EBUSY', 'ECHILD', 'ECHRNG', 'ECOMM', 'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'EDEADLK', 'EDEADLOCK', 'EDESTADDRREQ', 'EDOM', 'EDOTDOT', 'EDQUOT', 'EEXIST', 'EFAULT', 'EFBIG', 'EHOSTDOWN', 'EHOSTUNREACH', 'EIDRM', 'EILSEQ', 'EINPROGRESS', 'EINTR', 'EINVAL', 'EIO', 'EISCONN', 'EISDIR', 'EISNAM', 'EL2HLT', 'EL2NSYNC', 'EL3HLT', 'EL3RST', 'ELIBACC', 'ELIBBAD', 'ELIBEXEC', 'ELIBMAX', 'ELIBSCN', 'ELNRNG', 'ELOOP', 'EMFILE', 'EMLINK', 'EMSGSIZE', 'EMULTIHOP', 'ENAMETOOLONG', 'ENAVAIL', 'ENETDOWN', 'ENETRESET', 'ENETUNREACH', 'ENFILE', 'ENOANO', 'ENOBUFS', 'ENOCSI', 'ENODATA', 'ENODEV', 'ENOENT', 'ENOEXEC', 'ENOLCK', 'ENOLINK', 'ENOMEM', 'ENOMSG', 'ENONET', 'ENOPKG', 'ENOPROTOOPT', 'ENOSPC', 'ENOSR', 'ENOSTR', 'ENOSYS', 'ENOTBLK', 'ENOTCONN', 'ENOTDIR', 'ENOTEMPTY', 'ENOTNAM', 'ENOTSOCK', 'ENOTSUP', 'ENOTTY', 'ENOTUNIQ', 'ENXIO', 'EOPNOTSUPP', 'EOVERFLOW', 'EPERM', 'EPFNOSUPPORT', 'EPIPE', 'EPROTO', 'EPROTONOSUPPORT', 'EPROTOTYPE', 'ERANGE', 'EREMCHG', 'EREMOTE', 'EREMOTEIO', 'ERESTART', 'EROFS', 'ESHUTDOWN', 'ESOCKTNOSUPPORT', 'ESPIPE', 'ESRCH', 'ESRMNT', 'ESTALE', 'ESTRPIPE', 'ETIME', 'ETIMEDOUT', 'ETOOMANYREFS', 'ETXTBSY', 'EUCLEAN', 'EUNATCH', 'EUSERS', 'EWOULDBLOCK', 'EXDEV', 'EXFULL', '__doc__', '__name__', '__package__', 'errorcode']
+
 
 from fuse import FUSE, FuseOSError, Operations
 from stat import S_IFDIR, S_IFLNK, S_IFREG
@@ -26,13 +28,11 @@ class Cache(object):
         if self.data.get(params) is not None:
             entry_time, result = self.data.get(params)
             if time() - entry_time < self.cache_timeout:
-                print "Cache hit", params
                 return result
             else:
                 del self.data[params]
         
         return
-        
 
 class B2Bucket(object):
     def __init__(self, account_id, application_key, bucket_id, cache_timeout=100):
@@ -40,7 +40,6 @@ class B2Bucket(object):
         self.cache = {}
         
         self.api_url = 'https://api.backblaze.com'
-        
         
         self.account_id = account_id
         self.application_key = application_key
@@ -52,15 +51,10 @@ class B2Bucket(object):
         
         self.bucket_name = self.get_bucket_name(self.bucket_id)
         
-       # print self.get_bucket_name(self.bucket_id)
+    def _reset_cache(self):
+        self.cache = {}
         
-        self.cached = None
-        
-        
-        #print self.list_dir()
-        
-        #for f in self.list_dir():
-        #    print self.get_file(f)
+    #Bucket management calls (not cached)
         
     def list_buckets(self):
         subcache_name = "list_buckets"
@@ -70,8 +64,6 @@ class B2Bucket(object):
         if self.cache[subcache_name].get():
             return self.cache[subcache_name].get()
             
-        
-        # Get the upload URL
         bucket_list = call_api(
             self.api_url,
             '/b2api/v1/b2_list_buckets',
@@ -89,9 +81,7 @@ class B2Bucket(object):
             
         return
         
-        
     def get_upload_url(self):
-        # Get the upload URL
         upload_info = call_api(
             self.api_url,
             '/b2api/v1/b2_get_upload_url',
@@ -101,8 +91,6 @@ class B2Bucket(object):
         return upload_info['authorizationToken'], upload_info['uploadUrl']
         
     def authorize(self, account_id, application_key, bucket_id):
-        
-        # Authorize the account
         account_auth = call_api(
             self.api_url,
             '/b2api/v1/b2_authorize_account',
@@ -111,9 +99,11 @@ class B2Bucket(object):
             )
             
         return account_auth['authorizationToken'],account_auth['apiUrl'],account_auth['downloadUrl']
+        
+    #File listint calls
     
-    def list_dir(self):
-        subcache_name = "list_dir"
+    def _list_dir(self):
+        subcache_name = "_list_dir"
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
             
@@ -122,12 +112,27 @@ class B2Bucket(object):
         
         files = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1000})
         
-        result = map(lambda x: x['fileName'], files['files'])
+        result = files['files']
         self.cache[subcache_name].update(result)
+        return result
+    
+    def list_dir(self):
+        result =  map(lambda x: x['fileName'], self._list_dir())
         return result
         
     def get_file_info(self, filename):
-        subcache_name = "get_file_info"
+        
+        files = self._list_dir()
+        filtered_files = filter(lambda f: f['fileName'] == filename, files)
+        
+        try:
+            return filtered_files[0]
+        except:
+            return None
+        
+            
+    def get_file_versions(self, filename):
+        subcache_name = "get_file_versions"
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
             
@@ -136,24 +141,46 @@ class B2Bucket(object):
             return self.cache[subcache_name].get(params)
         
         
-        resp = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1,'startFileName': filename})
-        
+        resp = call_api(self.api_url,'/b2api/v1/b2_list_file_versions', self.account_token, { 'bucketId' : self.bucket_id,'startFileName': filename})
+        print "Versions", resp['files']
 
         try:
-            result = resp['files'][0]
+            filtered_files = filter(lambda f: f['fileName'] == filename, resp['files'])
+            result = map(lambda f: f['fileId'], filtered_files)
             self.cache[subcache_name].update(result, params)
             return result
-        except IndexError:
-            return None
-        except TypeError:
+        except:
             return None
             
+    #These calls are not cached, consider for performance
+            
+    def delete_file(self, filename, delete_all=True):   
+        print "Deleting files:",
+        file_ids = self.get_file_versions(filename)
+        
+        self._reset_cache()
+        
+        found_file = False
+        for file_id in file_ids:
+            resp = call_api(self.api_url,'/b2api/v1/b2_delete_file_version', self.account_token, {'fileName': filename, 'fileId': file_id})
+            
+            found_file = True
+                
+        return found_file
             
     def put_file(self, filename, data):
+        print "Uploading file", data
+        self._reset_cache()
+        
+        
+        print "\tDeleting all previous version first"
+        self.delete_file(filename)
+        print "\tDeletion complete"
+        
         headers = {
             'Authorization' : self.upload_auth_token,
             'X-Bz-File-Name' : filename,
-            'Content-Type' : 'text/plain',   # XXX
+            'Content-Type' : 'b2/x-auto',   # XXX
             'X-Bz-Content-Sha1' : hashlib.sha1(data).hexdigest()
             }
         
@@ -167,10 +194,12 @@ class B2Bucket(object):
         with OpenUrl(self.upload_url, data, encoded_headers) as response_file:
             json_text = response_file.read()
             file_info = json.loads(json_text)
+            
+            self._reset_cache()
             return file_info
     
     def get_file(self, filename):
-        url = self.download_url + '/file/' + self.bucket_name + '/' + filename
+        url = self.download_url + '/file/' + self.bucket_name + '/' + b2_url_encode(filename)
             
         headers = {'Authorization': self.account_token}
         encoded_headers = dict(
@@ -193,7 +222,7 @@ def load_config():
         return yaml.load(f.read())
         
 
-class Passthrough(Operations):
+class B2Fuse(Operations):
     def __init__(self, root):
         self.root = root
         
@@ -201,67 +230,65 @@ class Passthrough(Operations):
         self.bucket = B2Bucket(config['accountId'], config['applicationKey'], config['bucketId'])  
           
         self.open_files = defaultdict(bytes)
+        self.dirty_files = set()
         
         self.fd = 0
         
-
-    # Helpers
-    # =======
-
-    def _full_path(self, partial):
-        if partial.startswith("/"):
-            partial = partial[1:]
-        path = os.path.join(self.root, partial)
-        return path
-
     # Filesystem methods
     # ==================
-
-
+    
+    def _exists(self, path):
+        if path in self.bucket.list_dir():
+            print "File %s exists" % path
+            return True
+        if path in self.open_files.keys():
+            print "File %s exists" % path
+            return True
+            
+        print "File %s does not exist exists" % path
+        return False
+        
     def access(self, path, mode):
-        if mode == 1 or mode == 4:
-            return
-        else:
-            raise FuseOSError(errno.EACCES)
         print "Access", path, (mode)
-        return
-        full_path = self._full_path(path)
-        if not os.access(full_path, mode):
-            raise FuseOSError(errno.EACCES)
-
-    #def chmod(self, path, mode):
-        #print "Chmod", path, mode
-        #full_path = self._full_path(path)
-        #return os.chmod(full_path, mode)
-
-    #def chown(self, path, uid, gid):
-        #print "Chown", path, uid, gid
-        #full_path = self._full_path(path)
-        #return os.chown(full_path, uid, gid)
-
-    def getattr(self, path, fh=None):
-        print "Fetching attributes for ", path
-        
-        if path == "/":
-            print "Accessing root path"
-            return dict(st_mode=(S_IFDIR | 0755), st_ctime=time(),                       st_mtime=time(), st_atime=time(), st_nlink=2)
-        
-        else:
+        if path.startswith("/"):
             path = path[1:]
             
+        if path == "":
+            return 
             
-            if path not in self.bucket.list_dir():
-                raise FuseOSError(errno.EACCES)
-                
-            file_info = self.bucket.get_file_info(path)
+        if self._exists(path):
+            return 
             
-            return dict(st_mode=(S_IFREG | 0755), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
+        raise FuseOSError(errno.EACCES)
+        
+    def getattr(self, path, fh=None):
+        print "Fetching attributes for ", path
+        if path.startswith("/"):
+            path = path[1:]
+        
+        if path == "":
+            print "Accessing root path"
+            return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(),                       st_mtime=time(), st_atime=time(), st_nlink=2)
+        
+        else:
+            if not self._exists(path):
+                raise FuseOSError(errno.ENOENT)
 
+            else:
+                if path in self.bucket.list_dir():
+                    print "File is in bucket"
+                    file_info = self.bucket.get_file_info(path)
+                    
+                    return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
+                else:
+                    print "File exists only locally"
+                    
+                    return dict(st_mode=(S_IFREG | 0777), st_ctime=time(), st_mtime=time(), st_atime=time(), st_nlink=1, st_size=len(self.open_files[path]))
 
     def readdir(self, path, fh):
         print "Directory listing requested for", path
-        #print path, fh
-        full_path = self._full_path(path)
+        if path.startswith("/"):
+            path = path[1:]
 
         dirents = ['.', '..']
         
@@ -269,58 +296,85 @@ class Passthrough(Operations):
         
         dirents.extend(files)
         
-        #if os.path.isdir(full_path):
-            #dirents.extend(os.listdir(full_path))
+        for path in self.open_files.keys():
+            if path not in dirents:
+                dirents.append(path)
             
         return dirents
 
     #def readlink(self, path):
         #print "Readlink", path
-        #pathname = os.readlink(self._full_path(path))
-        #if pathname.startswith("/"):
-            ## Path name is absolute, sanitize it.
-            #return os.path.relpath(pathname, self.root)
-        #else:
-            #return pathname
 
 
     #def mknod(self, path, mode, dev):
         #print "Mknod", path, mode, dev
-        #return os.mknod(self._full_path(path), mode, dev)
 
-    #def rmdir(self, path):
-        #print "Rmdir", path
-        #full_path = self._full_path(path)
-        #return os.rmdir(full_path)
-
+    def rmdir(self, path):
+        print "Rmdir", path
+        if path.startswith("/"):
+            path = path[1:]
+            
+        self.bucket.delete_file(path)
+        
+        if path in self.dirty_files:
+            self.dirty_files.remove(path)
+        del self.open_files[path]
+        
     #def mkdir(self, path, mode):
         #print "Mkdir", path, mode
-        #return os.mkdir(self._full_path(path), mode)
-
-
 
     def statfs(self, path):
+        print "Fetching file system stats", path
         return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
-    #def unlink(self, path):
-        #print "Unlink", path
-        #return os.unlink(self._full_path(path))
+    def unlink(self, path):
+        print "Unlink", path
+        if path.startswith("/"):
+            path = path[1:]
+            
+        filename = path.split("/")[-1]
+        if not filename.startswith("."):
+            self.bucket.delete_file(path)
+        
+        if path in self.open_files.keys():
+            if path in self.dirty_files:
+                self.dirty_files.remove(path)
+            del self.open_files[path]
 
     #def symlink(self, name, target):
         #print "Symlink", name, target
-        #return os.symlink(name, self._full_path(target))
 
-    #def rename(self, old, new):
-        #print "Rename", old, new
-        #return os.rename(self._full_path(old), self._full_path(new))
+    def rename(self, old, new):
+        print "Rename", old, new
+        
+        if old.startswith("/"):
+            old = old[1:]
+            
+        if new.startswith("/"):
+            new = new[1:]
+        
+        if not self._exists(old):
+            raise FuseOSError(errno.ENOENT)
+            
+        if new != old and self._exists(new):
+            raise FuseOSError(errno.EEXIST)
+            
+        if old in self.dirty_files:
+            self.dirty_files.remove(old)
+            
+            
+        self.open_files[new] = self.open_files[old]
+        self.dirty_files.add(new)
+        self.flush(new, 0)
+        self.unlink(old)
+        
+        return 
 
     #def link(self, target, name):
         #print "Link", target, name
-        #return os.link(self._full_path(target), self._full_path(name))
 
     #def utimens(self, path, times=None):
         #print "utimens", path
-        #return os.utime(self._full_path(path), times)
 
     # File methods
     # ============
@@ -331,7 +385,8 @@ class Passthrough(Operations):
         if path.startswith("/"):
             path = path[1:]
             
-        if path not in self.bucket.list_dir():
+        #if path not in self.bucket.list_dir():
+        if not self._exists(path):
             raise FuseOSError(errno.EACCES)
             
         if self.open_files.get(path) is None:
@@ -339,56 +394,79 @@ class Passthrough(Operations):
                 self.open_files[path] = bytes(self.bucket.get_file(path))
             except:
                 raise FuseOSError(errno.EACCES)
-        print "File opened", path
+                
         self.fd += 1
         return self.fd
 
-    #def create(self, path, mode, fi=None):
-        #print "Create", path, mode
-        #full_path = self._full_path(path)
-        #return os.open(full_path, os.O_WRONLY | os.O_CREAT, mode)
+    def create(self, path, mode, fi=None):
+        print "Create", path, mode
+        if path.startswith("/"):
+            path = path[1:]
+            
+        self.dirty_files.add(path)
+            
+        self.open_files[path] = bytes()
+        
+        self.fd += 1
+        return self.fd
 
     def read(self, path, length, offset, fh):
+        print "Read", path, length, offset, fh
         if path.startswith("/"):
             path = path[1:]
         
-        print "Read", path, length, offset, fh
         return self.open_files[path][offset:offset + length]
 
     def write(self, path, data, offset, fh):
+        print "Write", path, data, offset
         if path.startswith("/"):
             path = path[1:]
-        print "Write", path, buf, offset
+            
+        self.dirty_files.add(path)
+        
         self.open_files[path] = self.open_files[path][:offset] + data
         return len(data)
 
 
-    #def truncate(self, path, length, fh=None):
-        #print "Truncate", path, length
-        #full_path = self._full_path(path)
-        #with open(full_path, 'r+') as f:
-            #f.truncate(length)
-
-    #def flush(self, path, fh):
-        #print "Flush", path, fh
-        #return os.fsync(fh)
-
-    def release(self, path, fh):
-        return
+    def truncate(self, path, length, fh=None):
+        print "Truncate", path, length
         if path.startswith("/"):
             path = path[1:]
             
+        self.dirty_files.add(path)
+            
+        self.open_files[path] = self.open_files[path][:length]
+
+    def flush(self, path, fh):
+        print "Flush", path, fh
+        if path.startswith("/"):
+            path = path[1:]
+            
+        if path not in self.dirty_files:
+            print "\tFile clean"
+            return 
+            
+        filename = path.split("/")[-1]
+        if not filename.startswith("."):
+            print "\tFile dirty, has to re-upload"
+            self.bucket.put_file(path, self.open_files[path])
+        else:
+            print "\tSkipping hidden file"
+        
+    
+        self.dirty_files.remove(path)
+
+    def release(self, path, fh):
         print "Release", path, fh
-        self.bucket.put_file(path, self.open_files[path])
-        
-        del self.open_files[path]
-        
-        ##return os.close(fh)
+        if path.startswith("/"):
+            path = path[1:]
+            
+        print "\tIndirect ", self.flush(path,fh)
 
 
 
 def main(mountpoint, root):
-    FUSE(Passthrough(root), mountpoint, nothreads=True, foreground=True)
+    FUSE(B2Fuse(root), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
     main(sys.argv[2], sys.argv[1])
