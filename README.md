@@ -21,3 +21,10 @@ bucketId: <yourbucketid>
 ```
 
 License: MIT license
+
+
+#### Known issues:
+
+* Concurrent access from multiple client will lead to inconsistent results
+* RSync does not work (lacking unknown file primitiv)
+* Directories are not supported
