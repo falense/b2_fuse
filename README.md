@@ -1,4 +1,8 @@
-# b2_fuse - A filesystem implementation for Backblaze B2
+# b2_fuse 
+
+## A filesystem implementation for Backblaze B2
+ 
+### Version: 0.1
 
 Requires FUSE for python to work
 
