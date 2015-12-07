@@ -37,7 +37,7 @@ class Cache(object):
         return
 
 class B2Bucket(object):
-    def __init__(self, account_id, application_key, bucket_id, cache_timeout=1):
+    def __init__(self, account_id, application_key, bucket_id, cache_timeout=5):
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
         self.cache_timeout = cache_timeout
@@ -326,7 +326,6 @@ class B2Fuse(Operations):
     #def readlink(self, path):
         #self.logger.debug("Readlink %s", path)
 
-
     #def mknod(self, path, mode, dev):
         #self.logger.debug("Mknod %s (mode:%s dev:%s)", path, mode, dev)
 
@@ -346,7 +345,8 @@ class B2Fuse(Operations):
 
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
-        return dict(f_bsize=1024, f_blocks=4096, f_bavail=1024*1024)
+        #Returns 1 petabyte free space, arbitrary number
+        return dict(f_bsize=1024, f_blocks=4096, f_bavail=1024*1024*1024*1024)
 
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
