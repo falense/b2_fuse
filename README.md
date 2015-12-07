@@ -20,11 +20,27 @@ applicationKey: <yourapplicationid>
 bucketId: <yourbucketid>
 ```
 
+####Using RSync with B2 Fuse
+
+Since there is no support for updating file times or permissions in a bucket, rsync must be told to ignore both when synching folders (sync will be based on checksum meaning files have to be downloaded to compare).
+
+```
+rsync -avzh --no-perms --no-owner --no-group dir1/ dir2/ 
+```
+
+####Using unison to synchronize against mounted folder
+
+Again, we ignore permissions as these are not applicable.
+
+```
+unison dir1/ dir2/ -auto  -perms 0  -batch
+```
+
 License: MIT license
+
 
 
 #### Known issues:
 
 * Concurrent access from multiple client will lead to inconsistent results
-* RSync does not work (lacking unknown file primitiv)
 * Directories are not supported

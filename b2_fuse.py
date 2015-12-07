@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from __future__ import with_statement
 from collections import defaultdict
@@ -169,7 +170,7 @@ class B2Bucket(object):
         return found_file
             
     def put_file(self, filename, data):
-        print "Uploading file", data
+        print "Uploading file", filename
         self._reset_cache()
         
         
@@ -187,11 +188,13 @@ class B2Bucket(object):
         if 'Content-Length' not in headers:
             headers['Content-Length'] = str(len(data))
         encoded_headers = dict(
-            (k, b2_url_encode(v))
+            (k.encode('ascii'), b2_url_encode(v).encode('ascii'))
             for (k, v) in headers.iteritems()
             )
             
-        with OpenUrl(self.upload_url, data, encoded_headers) as response_file:
+        print "Upload type", type(data)
+        
+        with OpenUrl(self.upload_url.encode('ascii'), data, encoded_headers) as response_file:
             json_text = response_file.read()
             file_info = json.loads(json_text)
             
@@ -209,6 +212,7 @@ class B2Bucket(object):
             
         with OpenUrl(url, None, encoded_headers) as resp:
             out = resp.read()
+            print "Download is of type", type(out)
             try:
                 return json.loads(out)
             except ValueError:
@@ -270,6 +274,7 @@ class B2Fuse(Operations):
         
         else:
             if not self._exists(path):
+                print "File does not exist, raising error (no such file)"
                 raise FuseOSError(errno.ENOENT)
 
             else:
@@ -280,8 +285,7 @@ class B2Fuse(Operations):
                     return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
                 else:
                     print "File exists only locally"
-                    
-                    return dict(st_mode=(S_IFREG | 0777), st_ctime=time(), st_mtime=time(), st_atime=time(), st_nlink=1, st_size=len(self.open_files[path]))
+                    return dict(st_mode=(S_IFREG | 0777), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=len(self.open_files[path]))
 
     def readdir(self, path, fh):
         print "Directory listing requested for", path
@@ -323,7 +327,7 @@ class B2Fuse(Operations):
 
     def statfs(self, path):
         print "Fetching file system stats", path
-        return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
+        return dict(f_bsize=1024, f_blocks=4096, f_bavail=1024*1024)
 
     def unlink(self, path):
         print "Unlink", path
@@ -416,7 +420,7 @@ class B2Fuse(Operations):
         return self.open_files[path][offset:offset + length]
 
     def write(self, path, data, offset, fh):
-        print "Write", path, data, offset
+        print "Write", path, len(data), offset
         if path.startswith("/"):
             path = path[1:]
             
