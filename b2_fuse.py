@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import with_statement
 from collections import defaultdict
 
 import os
 import sys
 import errno
+import argparse
+import logging
 #['E2BIG', 'EACCES', 'EADDRINUSE', 'EADDRNOTAVAIL', 'EADV', 'EAFNOSUPPORT', 'EAGAIN', 'EALREADY', 'EBADE', 'EBADF', 'EBADFD', 'EBADMSG', 'EBADR', 'EBADRQC', 'EBADSLT', 'EBFONT', 'EBUSY', 'ECHILD', 'ECHRNG', 'ECOMM', 'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'EDEADLK', 'EDEADLOCK', 'EDESTADDRREQ', 'EDOM', 'EDOTDOT', 'EDQUOT', 'EEXIST', 'EFAULT', 'EFBIG', 'EHOSTDOWN', 'EHOSTUNREACH', 'EIDRM', 'EILSEQ', 'EINPROGRESS', 'EINTR', 'EINVAL', 'EIO', 'EISCONN', 'EISDIR', 'EISNAM', 'EL2HLT', 'EL2NSYNC', 'EL3HLT', 'EL3RST', 'ELIBACC', 'ELIBBAD', 'ELIBEXEC', 'ELIBMAX', 'ELIBSCN', 'ELNRNG', 'ELOOP', 'EMFILE', 'EMLINK', 'EMSGSIZE', 'EMULTIHOP', 'ENAMETOOLONG', 'ENAVAIL', 'ENETDOWN', 'ENETRESET', 'ENETUNREACH', 'ENFILE', 'ENOANO', 'ENOBUFS', 'ENOCSI', 'ENODATA', 'ENODEV', 'ENOENT', 'ENOEXEC', 'ENOLCK', 'ENOLINK', 'ENOMEM', 'ENOMSG', 'ENONET', 'ENOPKG', 'ENOPROTOOPT', 'ENOSPC', 'ENOSR', 'ENOSTR', 'ENOSYS', 'ENOTBLK', 'ENOTCONN', 'ENOTDIR', 'ENOTEMPTY', 'ENOTNAM', 'ENOTSOCK', 'ENOTSUP', 'ENOTTY', 'ENOTUNIQ', 'ENXIO', 'EOPNOTSUPP', 'EOVERFLOW', 'EPERM', 'EPFNOSUPPORT', 'EPIPE', 'EPROTO', 'EPROTONOSUPPORT', 'EPROTOTYPE', 'ERANGE', 'EREMCHG', 'EREMOTE', 'EREMOTEIO', 'ERESTART', 'EROFS', 'ESHUTDOWN', 'ESOCKTNOSUPPORT', 'ESPIPE', 'ESRCH', 'ESRMNT', 'ESTALE', 'ESTRPIPE', 'ETIME', 'ETIMEDOUT', 'ETOOMANYREFS', 'ETXTBSY', 'EUCLEAN', 'EUNATCH', 'EUSERS', 'EWOULDBLOCK', 'EXDEV', 'EXFULL', '__doc__', '__name__', '__package__', 'errorcode']
 
 
@@ -36,7 +37,9 @@ class Cache(object):
         return
 
 class B2Bucket(object):
-    def __init__(self, account_id, application_key, bucket_id, cache_timeout=100):
+    def __init__(self, account_id, application_key, bucket_id, cache_timeout=1):
+        self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
+        
         self.cache_timeout = cache_timeout
         self.cache = {}
         
@@ -108,9 +111,10 @@ class B2Bucket(object):
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
             
-        if self.cache[subcache_name].get():
+        if self.cache[subcache_name].get() is not None:
             return self.cache[subcache_name].get()
         
+        self.logger.info("Getting bucket filelist")
         files = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1000})
         
         result = files['files']
@@ -138,12 +142,12 @@ class B2Bucket(object):
             self.cache[subcache_name] = Cache(self.cache_timeout)
             
         params = (filename)
-        if self.cache[subcache_name].get(params):
+        if self.cache[subcache_name].get(params) is not None:
             return self.cache[subcache_name].get(params)
         
         
         resp = call_api(self.api_url,'/b2api/v1/b2_list_file_versions', self.account_token, { 'bucketId' : self.bucket_id,'startFileName': filename})
-        print "Versions", resp['files']
+        #print "Versions", resp['files']
 
         try:
             filtered_files = filter(lambda f: f['fileName'] == filename, resp['files'])
@@ -156,7 +160,10 @@ class B2Bucket(object):
     #These calls are not cached, consider for performance
             
     def delete_file(self, filename, delete_all=True):   
-        print "Deleting files:",
+        self.logger.info("Deleting %s (delete_all:%s)", filename, delete_all)
+        
+        
+        
         file_ids = self.get_file_versions(filename)
         
         self._reset_cache()
@@ -170,13 +177,13 @@ class B2Bucket(object):
         return found_file
             
     def put_file(self, filename, data):
-        print "Uploading file", filename
+        self.logger.info("Uploading %s (len:%s)", filename, len(data))
         self._reset_cache()
         
         
-        print "\tDeleting all previous version first"
-        self.delete_file(filename)
-        print "\tDeletion complete"
+        if filename in self.list_dir():
+            self.logger.info("Deleting previous versions before upload")
+            self.delete_file(filename)
         
         headers = {
             'Authorization' : self.upload_auth_token,
@@ -191,8 +198,6 @@ class B2Bucket(object):
             (k.encode('ascii'), b2_url_encode(v).encode('ascii'))
             for (k, v) in headers.iteritems()
             )
-            
-        print "Upload type", type(data)
         
         with OpenUrl(self.upload_url.encode('ascii'), data, encoded_headers) as response_file:
             json_text = response_file.read()
@@ -202,6 +207,7 @@ class B2Bucket(object):
             return file_info
     
     def get_file(self, filename):
+        self.logger.info("Downloading %s", filename)
         url = self.download_url + '/file/' + self.bucket_name + '/' + b2_url_encode(filename)
             
         headers = {'Authorization': self.account_token}
@@ -212,7 +218,6 @@ class B2Bucket(object):
             
         with OpenUrl(url, None, encoded_headers) as resp:
             out = resp.read()
-            print "Download is of type", type(out)
             try:
                 return json.loads(out)
             except ValueError:
@@ -227,31 +232,45 @@ def load_config():
         
 
 class B2Fuse(Operations):
-    def __init__(self):
+    def __init__(self, account_id = None, application_key = None, bucket_id = None):
+        self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
+        
         config = load_config()
-        self.bucket = B2Bucket(config['accountId'], config['applicationKey'], config['bucketId'])  
+        
+        if not account_id:
+            account_id = config['accountId']
+        
+        if not application_key:
+            application_key = config['applicationKey']
+            
+        if not bucket_id:
+            bucket_id = config['bucketId']
+            
+        self.bucket = B2Bucket(account_id, application_key, bucket_id)  
           
         self.open_files = defaultdict(bytes)
         self.dirty_files = set()
         
         self.fd = 0
         
+        
+        
     # Filesystem methods
     # ==================
     
     def _exists(self, path):
         if path in self.bucket.list_dir():
-            print "File %s exists" % path
+            #print "File %s exists" % path
             return True
         if path in self.open_files.keys():
-            print "File %s exists" % path
+            #print "File %s exists" % path
             return True
             
-        print "File %s does not exist exists" % path
+        #print "File %s does not exist exists" % path
         return False
         
     def access(self, path, mode):
-        print "Access", path, (mode)
+        self.logger.debug("Access %s (mode:%s)", path, mode)
         if path.startswith("/"):
             path = path[1:]
             
@@ -264,31 +283,31 @@ class B2Fuse(Operations):
         raise FuseOSError(errno.EACCES)
         
     def getattr(self, path, fh=None):
-        print "Fetching attributes for ", path
+        self.logger.debug("Get attr %s", path)
         if path.startswith("/"):
             path = path[1:]
         
         if path == "":
-            print "Accessing root path"
+            #print "Accessing root path"
             return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(),                       st_mtime=time(), st_atime=time(), st_nlink=2)
         
         else:
             if not self._exists(path):
-                print "File does not exist, raising error (no such file)"
+                #print "File does not exist, raising error (no such file)"
                 raise FuseOSError(errno.ENOENT)
 
             else:
                 if path in self.bucket.list_dir():
-                    print "File is in bucket"
+                    #print "File is in bucket"
                     file_info = self.bucket.get_file_info(path)
                     
                     return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
                 else:
-                    print "File exists only locally"
+                    #print "File exists only locally"
                     return dict(st_mode=(S_IFREG | 0777), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=len(self.open_files[path]))
 
     def readdir(self, path, fh):
-        print "Directory listing requested for", path
+        self.logger.debug("Readdir %s", path)
         if path.startswith("/"):
             path = path[1:]
 
@@ -305,14 +324,14 @@ class B2Fuse(Operations):
         return dirents
 
     #def readlink(self, path):
-        #print "Readlink", path
+        #self.logger.debug("Readlink %s", path)
 
 
     #def mknod(self, path, mode, dev):
-        #print "Mknod", path, mode, dev
+        #self.logger.debug("Mknod %s (mode:%s dev:%s)", path, mode, dev)
 
     def rmdir(self, path):
-        print "Rmdir", path
+        self.logger.debug("Rmdir %s", path)
         if path.startswith("/"):
             path = path[1:]
             
@@ -323,14 +342,14 @@ class B2Fuse(Operations):
         del self.open_files[path]
         
     #def mkdir(self, path, mode):
-        #print "Mkdir", path, mode
+        #self.logger.debug("Mkdir %s (mode:%s)", path, mode)
 
     def statfs(self, path):
-        print "Fetching file system stats", path
+        self.logger.debug("Fetching file system stats %s", path)
         return dict(f_bsize=1024, f_blocks=4096, f_bavail=1024*1024)
 
     def unlink(self, path):
-        print "Unlink", path
+        self.logger.debug("Unlink %s", path)
         if path.startswith("/"):
             path = path[1:]
             
@@ -344,10 +363,10 @@ class B2Fuse(Operations):
             del self.open_files[path]
 
     #def symlink(self, name, target):
-        #print "Symlink", name, target
+        #self.logger.debug("Symlink %s %s", name, target)
 
     def rename(self, old, new):
-        print "Rename", old, new
+        self.logger.debug("Rename old: %s, new %s", old, new)
         
         if old.startswith("/"):
             old = old[1:]
@@ -373,16 +392,16 @@ class B2Fuse(Operations):
         return 
 
     #def link(self, target, name):
-        #print "Link", target, name
+        #self.logger.debug("Link %s %s", target, name)
 
     #def utimens(self, path, times=None):
-        #print "utimens", path
+        #self.logger.debug("Utimens %s", path)
 
     # File methods
     # ============
 
     def open(self, path, flags):
-        print "Open", path, flags
+        self.logger.debug("Open %s (flags:%s)", path, flags)
         
         if path.startswith("/"):
             path = path[1:]
@@ -401,7 +420,7 @@ class B2Fuse(Operations):
         return self.fd
 
     def create(self, path, mode, fi=None):
-        print "Create", path, mode
+        self.logger.debug("Create %s (mode:%s)", path, mode)
         if path.startswith("/"):
             path = path[1:]
             
@@ -413,14 +432,14 @@ class B2Fuse(Operations):
         return self.fd
 
     def read(self, path, length, offset, fh):
-        print "Read", path, length, offset, fh
+        self.logger.debug("Read %s (len:%s offset:%s fh:%s)", path, length, offset, fh)
         if path.startswith("/"):
             path = path[1:]
         
         return self.open_files[path][offset:offset + length]
 
     def write(self, path, data, offset, fh):
-        print "Write", path, len(data), offset
+        self.logger.debug("Write %s (len:%s offset:%s)", path, len(data), offset)
         if path.startswith("/"):
             path = path[1:]
             
@@ -431,7 +450,7 @@ class B2Fuse(Operations):
 
 
     def truncate(self, path, length, fh=None):
-        print "Truncate", path, length
+        self.logger.debug("Truncate %s (%s)", path, length)
         if path.startswith("/"):
             path = path[1:]
             
@@ -440,35 +459,48 @@ class B2Fuse(Operations):
         self.open_files[path] = self.open_files[path][:length]
 
     def flush(self, path, fh):
-        print "Flush", path, fh
+        self.logger.debug("Flush %s %s", path, fh)
         if path.startswith("/"):
             path = path[1:]
             
         if path not in self.dirty_files:
-            print "\tFile clean"
+            #print "\tFile clean"
             return 
             
         filename = path.split("/")[-1]
         if not filename.startswith("."):
-            print "\tFile dirty, has to re-upload"
+            #print "\tFile dirty, has to re-upload"
             self.bucket.put_file(path, self.open_files[path])
-        else:
-            print "\tSkipping hidden file"
+        #else:
+            #print "\tSkipping hidden file"
         
     
         self.dirty_files.remove(path)
 
     def release(self, path, fh):
-        print "Release", path, fh
+        self.logger.debug("Release %s %s", path, fh)
         if path.startswith("/"):
             path = path[1:]
             
-        print "\tIndirect ", self.flush(path,fh)
+        self.logger.debug("Flushing file in case it was dirty")
+        self.flush(path,fh)
 
 
-
-def main(mountpoint):
-    FUSE(B2Fuse(), mountpoint, nothreads=True, foreground=True)
+def create_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mountpoint", type=str, help="Mountpoint for the B2 bucket")
+    
+    parser.add_argument("--account_id", type=str, default=None, help="Account ID for your B2 account (overrides config)")
+    parser.add_argument("--application_key", type=str, default=None, help="Application key for your account  (overrides config)")
+    parser.add_argument("--bucket_id", type=str, default=None, help="Bucket ID for the bucket to mount (overrides config)")
+    return parser
+    
+def main(mountpoint, account_id, application_key, bucket_id):
+    FUSE(B2Fuse(account_id, application_key, bucket_id), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    logging.basicConfig(level=logging.INFO)
+    
+    parser = create_parser()
+    args = parser.parse_args()
+    main(args.mountpoint, args.account_id, args.application_key, args.bucket_id)
