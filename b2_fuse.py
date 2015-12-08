@@ -8,6 +8,7 @@ import sys
 import errno
 import argparse
 import logging
+import array
 #['E2BIG', 'EACCES', 'EADDRINUSE', 'EADDRNOTAVAIL', 'EADV', 'EAFNOSUPPORT', 'EAGAIN', 'EALREADY', 'EBADE', 'EBADF', 'EBADFD', 'EBADMSG', 'EBADR', 'EBADRQC', 'EBADSLT', 'EBFONT', 'EBUSY', 'ECHILD', 'ECHRNG', 'ECOMM', 'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'EDEADLK', 'EDEADLOCK', 'EDESTADDRREQ', 'EDOM', 'EDOTDOT', 'EDQUOT', 'EEXIST', 'EFAULT', 'EFBIG', 'EHOSTDOWN', 'EHOSTUNREACH', 'EIDRM', 'EILSEQ', 'EINPROGRESS', 'EINTR', 'EINVAL', 'EIO', 'EISCONN', 'EISDIR', 'EISNAM', 'EL2HLT', 'EL2NSYNC', 'EL3HLT', 'EL3RST', 'ELIBACC', 'ELIBBAD', 'ELIBEXEC', 'ELIBMAX', 'ELIBSCN', 'ELNRNG', 'ELOOP', 'EMFILE', 'EMLINK', 'EMSGSIZE', 'EMULTIHOP', 'ENAMETOOLONG', 'ENAVAIL', 'ENETDOWN', 'ENETRESET', 'ENETUNREACH', 'ENFILE', 'ENOANO', 'ENOBUFS', 'ENOCSI', 'ENODATA', 'ENODEV', 'ENOENT', 'ENOEXEC', 'ENOLCK', 'ENOLINK', 'ENOMEM', 'ENOMSG', 'ENONET', 'ENOPKG', 'ENOPROTOOPT', 'ENOSPC', 'ENOSR', 'ENOSTR', 'ENOSYS', 'ENOTBLK', 'ENOTCONN', 'ENOTDIR', 'ENOTEMPTY', 'ENOTNAM', 'ENOTSOCK', 'ENOTSUP', 'ENOTTY', 'ENOTUNIQ', 'ENXIO', 'EOPNOTSUPP', 'EOVERFLOW', 'EPERM', 'EPFNOSUPPORT', 'EPIPE', 'EPROTO', 'EPROTONOSUPPORT', 'EPROTOTYPE', 'ERANGE', 'EREMCHG', 'EREMOTE', 'EREMOTEIO', 'ERESTART', 'EROFS', 'ESHUTDOWN', 'ESOCKTNOSUPPORT', 'ESPIPE', 'ESRCH', 'ESRMNT', 'ESTALE', 'ESTRPIPE', 'ETIME', 'ETIMEDOUT', 'ETOOMANYREFS', 'ETXTBSY', 'EUCLEAN', 'EUNATCH', 'EUSERS', 'EWOULDBLOCK', 'EXDEV', 'EXFULL', '__doc__', '__name__', '__package__', 'errorcode']
 
 
@@ -135,7 +136,29 @@ class B2Bucket(object):
         except:
             return None
         
+    def get_file_info_detailed(self, filename):
+        subcache_name = "get_file_info_detailed"
+        if self.cache.get(subcache_name) is None:
+            self.cache[subcache_name] = Cache(self.cache_timeout)
             
+        params = (filename)
+        if self.cache[subcache_name].get(params) is not None:
+            return self.cache[subcache_name].get(params)
+        
+        file_id = filter(lambda f: f['fileName'] == filename, self._list_dir())[0]['fileId']
+        
+        
+        
+        resp = call_api(self.api_url,'/b2api/v1/b2_get_file_info', self.account_token, { 'fileId' : file_id})
+        #print "Versions", resp['files']
+
+        try:
+            result = resp
+            self.cache[subcache_name].update(result, params)
+            return result
+        except:
+            return None
+    
     def get_file_versions(self, filename):
         subcache_name = "get_file_versions"
         if self.cache.get(subcache_name) is None:
@@ -320,6 +343,7 @@ class B2Fuse(Operations):
         for path in self.open_files.keys():
             if path not in dirents:
                 dirents.append(path)
+        
             
         return dirents
 
@@ -346,7 +370,7 @@ class B2Fuse(Operations):
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
-        return dict(f_bsize=1024, f_blocks=4096, f_bavail=1024*1024*1024*1024)
+        return dict(f_bsize=4096, f_blocks=1024*1024, f_bavail=1024*1024*1024*1024)
 
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
@@ -412,7 +436,7 @@ class B2Fuse(Operations):
             
         if self.open_files.get(path) is None:
             try:
-                self.open_files[path] = bytes(self.bucket.get_file(path))
+                self.open_files[path] = array.array('c',self.bucket.get_file(path))
             except:
                 raise FuseOSError(errno.EACCES)
                 
@@ -426,7 +450,7 @@ class B2Fuse(Operations):
             
         self.dirty_files.add(path)
             
-        self.open_files[path] = bytes()
+        self.open_files[path] = array.array('c')
         
         self.fd += 1
         return self.fd
@@ -436,7 +460,7 @@ class B2Fuse(Operations):
         if path.startswith("/"):
             path = path[1:]
         
-        return self.open_files[path][offset:offset + length]
+        return self.open_files[path][offset:offset + length].tostring()
 
     def write(self, path, data, offset, fh):
         self.logger.debug("Write %s (len:%s offset:%s)", path, len(data), offset)
@@ -445,7 +469,8 @@ class B2Fuse(Operations):
             
         self.dirty_files.add(path)
         
-        self.open_files[path] = self.open_files[path][:offset] + data
+        #self.open_files[path] = self.open_files[path][:offset] + data
+        self.open_files[path].extend(data)
         return len(data)
 
 
@@ -499,7 +524,7 @@ def main(mountpoint, account_id, application_key, bucket_id):
     FUSE(B2Fuse(account_id, application_key, bucket_id), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     
     parser = create_parser()
     args = parser.parse_args()
