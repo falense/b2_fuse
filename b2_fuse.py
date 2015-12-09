@@ -37,12 +37,60 @@ class Cache(object):
         
         return
 
+class DirectoryStructure(object):
+    def __init__(self):
+        self._folders = {}
+        
+    def update_structure(self, file_list, local_directories):
+        folder_list = map(lambda f: f.split("/")[:-1], file_list)
+        folder_list.extend(map(lambda f: f.split("/"), local_directories))
+        
+        self._folders = {}
+        for folder in folder_list:
+            self._lookup(self._folders, folder,True)
+            
+    def _lookup(self, folders, path, update=False):
+        if len(path) == 0:
+            return folders
+            
+        head = path.pop(0)
+        if update and folders.get(head) is None:
+            folders[head] = {}
+        
+        if folders.get(head) is not None:
+            return self._lookup(folders[head], path, update)
+        else:
+            return None
+        
+    def is_directory(self, path):
+        if self.get_directories(path) is None:
+            return False
+        else:
+            return True
+            
+    def get_directories(self, path):
+        if len(path) == 0:
+            return self._folders.keys()
+        else:
+            path_split = path.split("/")
+            r = self._lookup(self._folders, path_split)
+            
+            if r is not None:
+                return r.keys()
+            else:
+                return None
+    def in_folder(self, path):
+        
+        return False
+    
+
 class B2Bucket(object):
     def __init__(self, account_id, application_key, bucket_id, cache_timeout=5):
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
         self.cache_timeout = cache_timeout
         self.cache = {}
+        
         
         self.api_url = 'https://api.backblaze.com'
         
@@ -123,11 +171,10 @@ class B2Bucket(object):
         return result
     
     def list_dir(self):
-        result =  map(lambda x: x['fileName'], self._list_dir())
+        result =  map(lambda x: x['fileName'], self._list_dir())        
         return result
         
     def get_file_info(self, filename):
-        
         files = self._list_dir()
         filtered_files = filter(lambda f: f['fileName'] == filename, files)
         
@@ -147,11 +194,8 @@ class B2Bucket(object):
         
         file_id = filter(lambda f: f['fileName'] == filename, self._list_dir())[0]['fileId']
         
-        
-        
         resp = call_api(self.api_url,'/b2api/v1/b2_get_file_info', self.account_token, { 'fileId' : file_id})
         #print "Versions", resp['files']
-
         try:
             result = resp
             self.cache[subcache_name].update(result, params)
@@ -185,8 +229,6 @@ class B2Bucket(object):
     def delete_file(self, filename, delete_all=True):   
         self.logger.info("Deleting %s (delete_all:%s)", filename, delete_all)
         
-        
-        
         file_ids = self.get_file_versions(filename)
         
         self._reset_cache()
@@ -202,7 +244,6 @@ class B2Bucket(object):
     def put_file(self, filename, data):
         self.logger.info("Uploading %s (len:%s)", filename, len(data))
         self._reset_cache()
-        
         
         if filename in self.list_dir():
             self.logger.info("Deleting previous versions before upload")
@@ -255,7 +296,7 @@ def load_config():
         
 
 class B2Fuse(Operations):
-    def __init__(self, account_id = None, application_key = None, bucket_id = None):
+    def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=True):
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
         config = load_config()
@@ -270,9 +311,14 @@ class B2Fuse(Operations):
             bucket_id = config['bucketId']
             
         self.bucket = B2Bucket(account_id, application_key, bucket_id)  
+        
+        self.directories = DirectoryStructure()
+        self.local_directories = []
           
         self.open_files = defaultdict(bytes)
         self.dirty_files = set()
+        
+        self.enable_hashfiles = enable_hashfiles
         
         self.fd = 0
         
@@ -281,15 +327,15 @@ class B2Fuse(Operations):
     # Filesystem methods
     # ==================
     
-    def _exists(self, path):
+    def _exists(self, path, include_hash=True):
+        if include_hash and path.endswith(".sha1"):
+            path = path[:-5]
+        
         if path in self.bucket.list_dir():
-            #print "File %s exists" % path
             return True
         if path in self.open_files.keys():
-            #print "File %s exists" % path
             return True
-            
-        #print "File %s does not exist exists" % path
+        
         return False
         
     def access(self, path, mode):
@@ -297,54 +343,100 @@ class B2Fuse(Operations):
         if path.startswith("/"):
             path = path[1:]
             
-        if path == "":
-            return 
+        if self.directories.is_directory(path):
+            return
             
         if self._exists(path):
             return 
             
         raise FuseOSError(errno.EACCES)
         
+    def chmod(self, path, mode):
+        self.logger.debug( "Chmod %s (mode:%s)", path, mode)
+
+    def chown(self, path, uid, gid):
+        self.logger.debug("Chown %s (uid:%s gid:%s)", path, uid, gid)
+        
     def getattr(self, path, fh=None):
         self.logger.debug("Get attr %s", path)
         if path.startswith("/"):
             path = path[1:]
         
-        if path == "":
-            #print "Accessing root path"
-            return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(),                       st_mtime=time(), st_atime=time(), st_nlink=2)
-        
-        else:
-            if not self._exists(path):
-                #print "File does not exist, raising error (no such file)"
-                raise FuseOSError(errno.ENOENT)
-
+        #Check if path is a directory
+        if self.directories.is_directory(path):
+            return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(), st_mtime=time(), st_atime=time(), st_nlink=2)
+        #Check if path is a file
+        elif self._exists(path):
+            #If file exist return attributes
+            if path in self.bucket.list_dir():
+                #print "File is in bucket"
+                file_info = self.bucket.get_file_info(path)
+                return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
+            elif path.endswith(".sha1"):
+                #print "File is just a hash"
+                return dict(st_mode=(S_IFREG | 0444), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=42)
             else:
-                if path in self.bucket.list_dir():
-                    #print "File is in bucket"
-                    file_info = self.bucket.get_file_info(path)
-                    
-                    return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
-                else:
-                    #print "File exists only locally"
-                    return dict(st_mode=(S_IFREG | 0777), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=len(self.open_files[path]))
+                #print "File exists only locally"
+                return dict(st_mode=(S_IFREG | 0777), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=len(self.open_files[path]))
 
+        raise FuseOSError(errno.ENOENT)
+        
     def readdir(self, path, fh):
         self.logger.debug("Readdir %s", path)
         if path.startswith("/"):
             path = path[1:]
 
-        dirents = ['.', '..']
+        #Update the local filestructure
+        self.directories.update_structure(self.bucket.list_dir() + self.open_files.keys(), self.local_directories)
+         
+        dirents = []
         
-        files = self.bucket.list_dir()
-        
-        dirents.extend(files)
-        
-        for path in self.open_files.keys():
-            if path not in dirents:
-                dirents.append(path)
-        
+        def in_folder(filename):
+            if filename.startswith(path):
+                relative_filename = filename[len(path):]
+                
+                if relative_filename.startswith("/"):
+                    relative_filename = relative_filename[1:]
+                
+                if "/" not in relative_filename:
+                    return True
             
+            return False
+            
+            
+        #Add files found in bucket
+        bucket_files = self.bucket.list_dir()
+        for filename in bucket_files:
+            if in_folder(filename):
+                dirents.append(filename)
+        
+        #Add files kept in local memory
+        for filename in self.open_files.keys():
+            #File already listed
+            if filename in dirents:
+                continue
+            #File is not in current folder
+            if not in_folder(filename):
+                continue
+            #File is a virtual hashfile
+            if filename.endswith(".sha1"):
+                continue
+                
+            dirents.append(filename)
+        
+        #If filenames has a prefix (relative to path) remove this
+        if len(path) > 0:
+            dirents = map(lambda f: f[len(path)+1:], dirents)
+                
+        #Add hash files
+        if self.enable_hashfiles:
+            hashes = map(lambda fn: fn + ".sha1", dirents)
+            dirents.extend(hashes)
+        
+        #Add directories
+        dirents.extend(['.', '..'])
+        dirents.extend(self.directories.get_directories(path))
+        
         return dirents
 
     #def readlink(self, path):
@@ -364,8 +456,16 @@ class B2Fuse(Operations):
             self.dirty_files.remove(path)
         del self.open_files[path]
         
-    #def mkdir(self, path, mode):
-        #self.logger.debug("Mkdir %s (mode:%s)", path, mode)
+    def mkdir(self, path, mode):
+        self.logger.debug("Mkdir %s (mode:%s)", path, mode)
+        if path.startswith("/"):
+            path = path[1:]
+        
+        self.local_directories.append(path)
+        
+        #Update the local filestructure
+        self.directories.update_structure(self.bucket.list_dir() + self.open_files.keys(), self.local_directories)
+        
 
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
@@ -376,6 +476,9 @@ class B2Fuse(Operations):
         self.logger.debug("Unlink %s", path)
         if path.startswith("/"):
             path = path[1:]
+            
+        if not self._exists(path, include_hash=False):
+            return
             
         filename = path.split("/")[-1]
         if not filename.startswith("."):
@@ -401,12 +504,12 @@ class B2Fuse(Operations):
         if not self._exists(old):
             raise FuseOSError(errno.ENOENT)
             
-        if new != old and self._exists(new):
-            raise FuseOSError(errno.EEXIST)
+        if self._exists(new):
+            self.unlink(new)
+            #raise FuseOSError(errno.EEXIST)
             
         if old in self.dirty_files:
             self.dirty_files.remove(old)
-            
             
         self.open_files[new] = self.open_files[old]
         self.dirty_files.add(new)
@@ -418,28 +521,29 @@ class B2Fuse(Operations):
     #def link(self, target, name):
         #self.logger.debug("Link %s %s", target, name)
 
-    #def utimens(self, path, times=None):
-        #self.logger.debug("Utimens %s", path)
+    def utimens(self, path, times=None):
+        self.logger.debug("Utimens %s", path)
 
     # File methods
     # ============
 
     def open(self, path, flags):
         self.logger.debug("Open %s (flags:%s)", path, flags)
-        
         if path.startswith("/"):
             path = path[1:]
             
-        #if path not in self.bucket.list_dir():
         if not self._exists(path):
             raise FuseOSError(errno.EACCES)
             
-        if self.open_files.get(path) is None:
+        if path.endswith(".sha1"):
+            file_hash = self.bucket.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
+            self.open_files[path] = array.array('c',file_hash.encode("utf-8"))
+        elif self.open_files.get(path) is None:
             try:
                 self.open_files[path] = array.array('c',self.bucket.get_file(path))
             except:
                 raise FuseOSError(errno.EACCES)
-                
+        
         self.fd += 1
         return self.fd
 
@@ -469,7 +573,6 @@ class B2Fuse(Operations):
             
         self.dirty_files.add(path)
         
-        #self.open_files[path] = self.open_files[path][:offset] + data
         self.open_files[path].extend(data)
         return len(data)
 
@@ -489,16 +592,11 @@ class B2Fuse(Operations):
             path = path[1:]
             
         if path not in self.dirty_files:
-            #print "\tFile clean"
             return 
             
         filename = path.split("/")[-1]
-        if not filename.startswith("."):
-            #print "\tFile dirty, has to re-upload"
+        if not filename.startswith(".") and not filename.endswith(".sha1"):
             self.bucket.put_file(path, self.open_files[path])
-        #else:
-            #print "\tSkipping hidden file"
-        
     
         self.dirty_files.remove(path)
 

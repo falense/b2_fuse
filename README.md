@@ -26,8 +26,7 @@ bucketId: <yourbucketid>
 
 * Can be used as a regular filesystem, but should not (as it is actually in the cloud, no local copy exists)
 * Partial files are cached in memory. If you write or read very large files this may cause issues. Todo add memory usage limit.
-* Does not support file permissions or timestamps, use accordingly
-
+* Neither permissions or timestamps is supported by B2. B2_fuse should gracefully ignore any requests to set permissions.
 
 ### Application specific notes:
 
@@ -47,10 +46,15 @@ Again, we ignore permissions as these are not applicable.
 unison dir1/ dir2/ -auto  -perms 0  -batch
 ```
 
+### Future improvements:
+
+* Memory usage limit
+* Creation of buckets?
+* Bucket listing on cmd line
+
 ### Known issues:
 
 * Concurrent access from multiple client will lead to inconsistent results
-* Directories are not supported
 
 License: MIT license
 
