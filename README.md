@@ -1,6 +1,6 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 0.1
+### Version: 1.0
 
 #### Warning this software is BETA. It may destroy your bucket, you have been warned.
 
@@ -27,6 +27,7 @@ bucketId: <yourbucketid>
 * Can be used as a regular filesystem, but should not (as it is actually in the cloud, no local copy exists)
 * Partial files are cached in memory. If you write or read very large files this may cause issues. Todo add memory usage limit.
 * Neither permissions or timestamps is supported by B2. B2_fuse should gracefully ignore any requests to set permissions.
+* Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 
 ### Application specific notes:
 
@@ -46,11 +47,14 @@ Again, we ignore permissions as these are not applicable.
 unison dir1/ dir2/ -auto  -perms 0  -batch
 ```
 
-### Future improvements:
+#### Using encfs to overlay a locally encrypted filesystem onto the bucket
 
-* Memory usage limit
-* Creation of buckets?
-* Bucket listing on cmd line
+Install encfs (apt-get install encfs)
+
+```
+encfs <bucket_mountpoint> <encrypted_filesystem>
+```
+
 
 ### Known issues:
 

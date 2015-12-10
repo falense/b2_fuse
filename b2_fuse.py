@@ -1,6 +1,28 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+#The MIT License (MIT)
+
+#Copyright (c) 2015 Sondre Engebraaten
+
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+
+#The above copyright notice and this permission notice shall be included in all
+#copies or substantial portions of the Software.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#SOFTWARE.
+
 from collections import defaultdict
 
 import os
@@ -79,13 +101,14 @@ class DirectoryStructure(object):
                 return r.keys()
             else:
                 return None
+                
     def in_folder(self, path):
         
         return False
     
 
 class B2Bucket(object):
-    def __init__(self, account_id, application_key, bucket_id, cache_timeout=5):
+    def __init__(self, account_id, application_key, bucket_id, cache_timeout=120):
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
         self.cache_timeout = cache_timeout
@@ -450,11 +473,51 @@ class B2Fuse(Operations):
         if path.startswith("/"):
             path = path[1:]
             
-        self.bucket.delete_file(path)
+        def in_folder(filename):
+            if filename.startswith(path):
+                relative_filename = filename[len(path):]
+                
+                if relative_filename.startswith("/"):
+                    relative_filename = relative_filename[1:]
+                
+                if "/" not in relative_filename:
+                    return True
+            
+            return False
+            
+        dirents = []
+        #Add files found in bucket
+        bucket_files = self.bucket.list_dir()
+        for filename in bucket_files:
+            if in_folder(filename):
+                dirents.append(filename)
         
-        if path in self.dirty_files:
-            self.dirty_files.remove(path)
-        del self.open_files[path]
+        #Add files kept in local memory
+        for filename in self.open_files.keys():
+            #File already listed
+            if filename in dirents:
+                continue
+            #File is not in current folder
+            if not in_folder(filename):
+                continue
+            #File is a virtual hashfile
+            if filename.endswith(".sha1"):
+                continue
+                
+            dirents.append(filename)
+            
+        for filename in dirents:
+            self.bucket.delete_file(filename)
+            if filename in self.open_files.key():
+                del self.open_files[path]
+        
+            if filename in self.dirty_files:
+                self.dirty_files.remove(filename)
+                
+        if self.directories.is_directory(path):
+            if path in self.local_directories:
+                i =  self.local_directories.index(path)
+                self.local_directories.pop(i)
         
     def mkdir(self, path, mode):
         self.logger.debug("Mkdir %s (mode:%s)", path, mode)
@@ -480,9 +543,7 @@ class B2Fuse(Operations):
         if not self._exists(path, include_hash=False):
             return
             
-        filename = path.split("/")[-1]
-        if not filename.startswith("."):
-            self.bucket.delete_file(path)
+        self.bucket.delete_file(path)
         
         if path in self.open_files.keys():
             if path in self.dirty_files:
@@ -595,7 +656,7 @@ class B2Fuse(Operations):
             return 
             
         filename = path.split("/")[-1]
-        if not filename.startswith(".") and not filename.endswith(".sha1"):
+        if not filename.endswith(".sha1"):
             self.bucket.put_file(path, self.open_files[path])
     
         self.dirty_files.remove(path)
