@@ -25,7 +25,7 @@ bucketId: <yourbucketid>
 ### Usage notes:
 
 * Can be used as a regular filesystem, but should not (as it is actually in the cloud, no local copy exists)
-* Partial files are cached in memory. If you write or read very large files this may cause issues. Todo add memory usage limit.
+* Partial files are cached in memory. If you write or read very large files this may cause issues (you are limited by available ram)
 * Neither permissions or timestamps is supported by B2. B2_fuse should gracefully ignore any requests to set permissions.
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 

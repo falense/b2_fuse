@@ -218,7 +218,7 @@ class B2Bucket(object):
         file_id = filter(lambda f: f['fileName'] == filename, self._list_dir())[0]['fileId']
         
         resp = call_api(self.api_url,'/b2api/v1/b2_get_file_info', self.account_token, { 'fileId' : file_id})
-        #print "Versions", resp['files']
+
         try:
             result = resp
             self.cache[subcache_name].update(result, params)
@@ -237,7 +237,6 @@ class B2Bucket(object):
         
         
         resp = call_api(self.api_url,'/b2api/v1/b2_list_file_versions', self.account_token, { 'bucketId' : self.bucket_id,'startFileName': filename})
-        #print "Versions", resp['files']
 
         try:
             filtered_files = filter(lambda f: f['fileName'] == filename, resp['files'])
@@ -319,7 +318,7 @@ def load_config():
         
 
 class B2Fuse(Operations):
-    def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=True):
+    def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=True, memory_limit=128):
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
         config = load_config()
@@ -340,8 +339,10 @@ class B2Fuse(Operations):
           
         self.open_files = defaultdict(bytes)
         self.dirty_files = set()
+        self.closed_files = set()
         
         self.enable_hashfiles = enable_hashfiles
+        self.memory_limit = memory_limit
         
         self.fd = 0
         
@@ -360,6 +361,14 @@ class B2Fuse(Operations):
             return True
         
         return False
+        
+    def _get_memory_consumption(self):
+        open_file_sizes = map(lambda f: len(f), self.open_files.values())
+        
+        memory = sum(open_file_sizes)
+        
+        return float(memory)/(1024*1024)
+        
         
     def access(self, path, mode):
         self.logger.debug("Access %s (mode:%s)", path, mode)
@@ -382,6 +391,7 @@ class B2Fuse(Operations):
         
     def getattr(self, path, fh=None):
         self.logger.debug("Get attr %s", path)
+        self.logger.debug("Memory used %s", round(self._get_memory_consumption(),2))
         if path.startswith("/"):
             path = path[1:]
         
@@ -535,6 +545,15 @@ class B2Fuse(Operations):
         #Returns 1 petabyte free space, arbitrary number
         return dict(f_bsize=4096, f_blocks=1024*1024, f_bavail=1024*1024*1024*1024)
 
+
+    def _remove_local_file(self, path):
+        if path in self.open_files.keys():
+            if path in self.dirty_files:
+                self.dirty_files.remove(path)
+            del self.open_files[path]
+            self.closed_files.remove(path)
+            
+
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
         if path.startswith("/"):
@@ -545,10 +564,7 @@ class B2Fuse(Operations):
             
         self.bucket.delete_file(path)
         
-        if path in self.open_files.keys():
-            if path in self.dirty_files:
-                self.dirty_files.remove(path)
-            del self.open_files[path]
+        self._remove_local_file(path)
 
     #def symlink(self, name, target):
         #self.logger.debug("Symlink %s %s", name, target)
@@ -668,6 +684,18 @@ class B2Fuse(Operations):
             
         self.logger.debug("Flushing file in case it was dirty")
         self.flush(path,fh)
+        
+        self.closed_files.add(path)
+        
+        if self._get_memory_consumption() > self.memory_limit:
+            self.logger.debug("Memory consumption overflow, purging file")
+            biggest_file = None
+            for filename in self.closed_files:
+                if biggest_file is None or len(self.open_files[filename]) > len(self.open_files[biggest_file]):
+                    biggest_file = filename
+                    
+            self.logger.debug("File %s was chosen for purging, this will free %s MB" % (biggest_file, len(self.open_files[biggest_file])/(1024**2)))
+            self._remove_local_file(biggest_file)
 
 
 def create_parser():
