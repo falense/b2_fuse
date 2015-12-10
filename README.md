@@ -2,7 +2,7 @@
  
 ### Version: 1.0
 
-#### Warning this software is BETA. It may destroy your bucket, you have been warned.
+#### Warning this software may contain bugs, be careful of using it with important data.
 
 ### Basic setup:
 
