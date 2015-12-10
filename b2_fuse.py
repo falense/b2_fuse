@@ -650,7 +650,10 @@ class B2Fuse(Operations):
             
         self.dirty_files.add(path)
         
-        self.open_files[path].extend(data)
+        
+        r = self.open_files[path][:offset] + array.array('c', data) + self.open_files[path][offset+len(data):]
+        self.open_files[path] = r
+        
         return len(data)
 
 
