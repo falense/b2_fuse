@@ -41,6 +41,8 @@ Since there is no support for updating file times or permissions in a bucket, rs
 rsync -avzh --no-perms --no-owner --no-group dir1/ dir2/ 
 ```
 
+Option "--inplace" may also be useful. RSync creates a temporary file when syncing, this option will make RSync update the file inplace instead (Effectively twice as fast syncing).
+
 ####Using unison to synchronize against mounted folder
 
 Again, we ignore permissions as these are not applicable.
