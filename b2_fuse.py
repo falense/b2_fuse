@@ -551,7 +551,8 @@ class B2Fuse(Operations):
             if path in self.dirty_files:
                 self.dirty_files.remove(path)
             del self.open_files[path]
-            self.closed_files.remove(path)
+            if path in self.closed_files:
+                self.closed_files.remove(path)
             
 
     def unlink(self, path):
