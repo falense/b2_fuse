@@ -70,7 +70,6 @@ encfs <bucket_mountpoint> <encrypted_filesystem>
 ### Known issues:
 
 * Concurrent access from multiple client will lead to inconsistent results
-* Maximum file count per bucket is 1000
 * Small files give low read/write performance (due to high latency)
 
 License: MIT license
