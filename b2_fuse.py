@@ -58,6 +58,39 @@ class Cache(object):
                 del self.data[params]
         
         return
+        
+        
+class FileCache(Cache):
+    def add_file(self, upload_resp):
+        new_file = {}
+        new_file['fileName'] = upload_resp['fileName']
+        new_file['fileId'] = upload_resp['fileId']
+        new_file['uploadTimestamp'] = time()
+        new_file['action'] = 'upload'
+        new_file['size'] = upload_resp['contentLength']
+        
+        for key, (timestamp,value) in self.data.items():
+            if new_file['fileName'].startswith(key):
+                value.append(new_file)
+                new_item = (timestamp, value)
+                self.data[key] =  new_item
+                #print "Adding file %s to cache %s" % (new_file['fileName'], key)
+                
+    def remove_file(self, filename):
+        for key, (timestamp,value) in self.data.items():
+            found_i = -1
+            for i, f in enumerate(value):
+                if f['fileName'] == filename:
+                    found_i = i
+                    break
+            
+            if found_i != -1:
+                timestamp,value = self.data[key]
+                value.pop(found_i)
+                self.data[key] = (timestamp, value)
+                #print "Removing file %s from cache %s" % (filename, key)
+            
+       
 
 class DirectoryStructure(object):
     def __init__(self):
@@ -134,6 +167,7 @@ class B2Bucket(object):
     #Bucket management calls (not cached)
         
     def list_buckets(self):
+        self.logger.info("list_buckets")
         subcache_name = "list_buckets"
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
@@ -180,14 +214,14 @@ class B2Bucket(object):
     #File listint calls
     
     def _list_dir(self, startFilename=""):
+        self.logger.info("_list_dir %s" %startFilename)
         subcache_name = "_list_dir"
         if self.cache.get(subcache_name) is None:
-            self.cache[subcache_name] = Cache(self.cache_timeout)
+            self.cache[subcache_name] = FileCache(self.cache_timeout)
             
         if self.cache[subcache_name].get(startFilename) is not None:
             return self.cache[subcache_name].get(startFilename)
         
-        self.logger.info("Getting bucket filelist")
         
         resp = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1000, 'startFileName': startFilename})
         result = resp['files']
@@ -203,10 +237,13 @@ class B2Bucket(object):
         return result
     
     def list_dir(self, path=""):
+        self.logger.info("list_dir %s", path)
         result =  map(lambda x: x['fileName'], self._list_dir(path))     
         return result
         
     def get_file_info(self, filename):
+        self.logger.info("get_file_info %s", filename)
+        
         files = self._list_dir()
         filtered_files = filter(lambda f: f['fileName'] == filename, files)
         
@@ -216,6 +253,8 @@ class B2Bucket(object):
             return None
         
     def get_file_info_detailed(self, filename):
+        self.logger.info("get_file_info_detailed %s", filename)
+        
         subcache_name = "get_file_info_detailed"
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
@@ -236,6 +275,8 @@ class B2Bucket(object):
             return None
     
     def get_file_versions(self, filename):
+        self.logger.info("get_file_versions %s" % filename)
+        
         subcache_name = "get_file_versions"
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
@@ -258,23 +299,23 @@ class B2Bucket(object):
     #These calls are not cached, consider for performance
             
     def delete_file(self, filename, delete_all=True):   
-        self.logger.info("Deleting %s (delete_all:%s)", filename, delete_all)
+        self.logger.info("delete_file %s (delete_all:%s)", filename, delete_all)
         
         file_ids = self.get_file_versions(filename)
         
-        self._reset_cache()
+        self.cache['_list_dir'].remove_file(filename)
+        #self._reset_cache()
         
         found_file = False
         for file_id in file_ids:
             resp = call_api(self.api_url,'/b2api/v1/b2_delete_file_version', self.account_token, {'fileName': filename, 'fileId': file_id})
             
             found_file = True
-                
+            
         return found_file
             
     def put_file(self, filename, data):
-        self.logger.info("Uploading %s (len:%s)", filename, len(data))
-        self._reset_cache()
+        self.logger.info("put_file %s (len:%s)", filename, len(data))
         
         if filename in self.list_dir():
             self.logger.info("Deleting previous versions before upload")
@@ -284,11 +325,10 @@ class B2Bucket(object):
             'Authorization' : self.upload_auth_token,
             'X-Bz-File-Name' : filename,
             'Content-Type' : 'b2/x-auto',   # XXX
-            'X-Bz-Content-Sha1' : hashlib.sha1(data).hexdigest()
+            'X-Bz-Content-Sha1' : hashlib.sha1(data).hexdigest(),
+            'Content-Length' : str(len(data))
             }
         
-        if 'Content-Length' not in headers:
-            headers['Content-Length'] = str(len(data))
         encoded_headers = dict(
             (k.encode('ascii'), b2_url_encode(v).encode('ascii'))
             for (k, v) in headers.iteritems()
@@ -298,11 +338,14 @@ class B2Bucket(object):
             json_text = response_file.read()
             file_info = json.loads(json_text)
             
-            self._reset_cache()
+            self.cache['_list_dir'].add_file(file_info)
+            #self._reset_cache()
+            
+            self.logger.info("put_file Upload complete")
             return file_info
     
     def get_file(self, filename):
-        self.logger.info("Downloading %s", filename)
+        self.logger.info("get_file %s", filename)
         url = self.download_url + '/file/' + self.bucket_name + '/' + b2_url_encode(filename)
             
         headers = {'Authorization': self.account_token}
@@ -726,7 +769,9 @@ def main(mountpoint, account_id, application_key, bucket_id):
     FUSE(B2Fuse(account_id, application_key, bucket_id), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
+    
+    
     
     parser = create_parser()
     args = parser.parse_args()
