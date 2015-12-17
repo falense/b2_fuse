@@ -130,6 +130,7 @@ class B2Bucket(object):
     def _reset_cache(self):
         self.cache = {}
         
+        
     #Bucket management calls (not cached)
         
     def list_buckets(self):
@@ -178,23 +179,31 @@ class B2Bucket(object):
         
     #File listint calls
     
-    def _list_dir(self):
+    def _list_dir(self, startFilename=""):
         subcache_name = "_list_dir"
         if self.cache.get(subcache_name) is None:
             self.cache[subcache_name] = Cache(self.cache_timeout)
             
-        if self.cache[subcache_name].get() is not None:
-            return self.cache[subcache_name].get()
+        if self.cache[subcache_name].get(startFilename) is not None:
+            return self.cache[subcache_name].get(startFilename)
         
         self.logger.info("Getting bucket filelist")
-        files = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1000})
         
-        result = files['files']
-        self.cache[subcache_name].update(result)
+        resp = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1000, 'startFileName': startFilename})
+        result = resp['files']
+        nextFilename = resp['nextFileName']
+        
+        while len(resp['files']) == 1000 and nextFilename.startswith(startFilename):
+            resp = call_api(self.api_url,'/b2api/v1/b2_list_file_names', self.account_token, { 'bucketId' : self.bucket_id, 'maxFileCount': 1000, 'startFileName': nextFilename})
+            result.extend(resp['files'])
+            nextFilename = resp['nextFileName']
+        
+        self.cache[subcache_name].update(result, startFilename)
+        
         return result
     
-    def list_dir(self):
-        result =  map(lambda x: x['fileName'], self._list_dir())        
+    def list_dir(self, path=""):
+        result =  map(lambda x: x['fileName'], self._list_dir(path))     
         return result
         
     def get_file_info(self, filename):
@@ -420,7 +429,7 @@ class B2Fuse(Operations):
             path = path[1:]
 
         #Update the local filestructure
-        self.directories.update_structure(self.bucket.list_dir() + self.open_files.keys(), self.local_directories)
+        self.directories.update_structure(self.bucket.list_dir(path) + self.open_files.keys(), self.local_directories)
          
         dirents = []
         
