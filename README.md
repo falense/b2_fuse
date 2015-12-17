@@ -1,12 +1,19 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.0
+### Version: 1.1
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 
 ### Basic setup:
 
-Requires FUSE for python to work
+Requires FUSE for python to work (this is not the same as "python-fuse" package). 
+
+Install FUSE for python as follows: 
+
+```
+sudo apt-get install python-pip
+sudo pip install fusepy
+```
 
 Usage:
 
@@ -28,7 +35,7 @@ bucketId: <yourbucketid>
 * Partial files are cached in memory. If you write or read very large files this may cause issues (you are limited by available ram)
 * Neither permissions or timestamps are supported by B2. B2_fuse should gracefully ignore any requests to set permissions.
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
-* Maximum files per bucket is limited to 1000. This limit is given by the way B2 API is structured, it can be increased at the cost of performance. Open an issue if this is a problem for your use-cases.
+* Having many files in a bucket (multiples of 1000) will drastically increase the startup time/mount time. 
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
 
 ### Application specific notes:
