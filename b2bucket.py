@@ -172,10 +172,10 @@ class B2Bucket(object):
             return None
         
     def get_file_info_detailed(self, filename):
-        func_name = get_file_info_detailed
+        func_name = "get_file_info_detailed"
         func_params = (filename)
         api_call = '/b2api/v1/b2_get_file_info'
-        api_call_params = { 'fileId' : file_id}
+        api_call_params = { 'fileId' : self.get_file_info(filename)['fileId']}
         
         self.logger.info("%s %s", func_name, filename)
         

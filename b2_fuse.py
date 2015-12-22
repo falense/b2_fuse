@@ -67,10 +67,7 @@ class DirectoryStructure(object):
             return None
         
     def is_directory(self, path):
-        if self.get_directories(path) is None:
-            return False
-        else:
-            return True
+        return self.get_directories(path) is not None
             
     def get_directories(self, path):
         if len(path) == 0:
@@ -84,9 +81,6 @@ class DirectoryStructure(object):
             else:
                 return None
                 
-    def in_folder(self, path):
-        
-        return False
 
 def load_config():
     with open("config.yaml") as f:
@@ -146,7 +140,6 @@ class B2Fuse(Operations):
         
         return float(memory)/(1024*1024)
         
-        
     def access(self, path, mode):
         self.logger.debug("Access %s (mode:%s)", path, mode)
         if path.startswith("/"):
@@ -161,7 +154,7 @@ class B2Fuse(Operations):
         raise FuseOSError(errno.EACCES)
         
     def chmod(self, path, mode):
-        self.logger.debug( "Chmod %s (mode:%s)", path, mode)
+        self.logger.debug("Chmod %s (mode:%s)", path, mode)
 
     def chown(self, path, uid, gid):
         self.logger.debug("Chown %s (uid:%s gid:%s)", path, uid, gid)
@@ -370,8 +363,6 @@ class B2Fuse(Operations):
         self.dirty_files.add(new)
         self.flush(new, 0)
         self.unlink(old)
-        
-        return 
 
     #def link(self, target, name):
         #self.logger.debug("Link %s %s", target, name)
@@ -436,7 +427,6 @@ class B2Fuse(Operations):
         
         return len(data)
 
-
     def truncate(self, path, length, fh=None):
         self.logger.debug("Truncate %s (%s)", path, length)
         if path.startswith("/"):
@@ -495,8 +485,6 @@ def main(mountpoint, account_id, application_key, bucket_id):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
-    
-    
     
     parser = create_parser()
     args = parser.parse_args()
