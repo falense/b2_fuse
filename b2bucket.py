@@ -150,8 +150,8 @@ class B2Bucket(object):
             resp = call_api(self.api_url, api_call, self.account_token, call_params)
             result = resp['files']
             nextFilename = resp['nextFileName']
-            
             while len(resp['files']) == 1000 and nextFilename.startswith(startFilename):
+                call_params['startFileName'] = nextFilename
                 resp = call_api(self.api_url, api_call, self.account_token, call_params)
                 result.extend(resp['files'])
                 nextFilename = resp['nextFileName']
