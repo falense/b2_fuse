@@ -313,7 +313,7 @@ class B2Fuse(Operations):
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
-        return dict(f_bsize=4096, f_blocks=1024*1024, f_bavail=1024*1024*1024*1024)
+        return dict(f_bsize=4096*16, f_blocks=1024**4, f_bfree=1024**4, f_bavail=1024**4)
 
 
     def _remove_local_file(self, path):
