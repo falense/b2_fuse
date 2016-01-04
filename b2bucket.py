@@ -255,10 +255,6 @@ class B2Bucket(object):
         encoded_headers = self._encode_headers(api_call_params)
             
         with OpenUrl(api_url, None, encoded_headers) as resp:
-            out = resp.read()
-            try:
-                return json.loads(out)
-            except ValueError:
-                return out
+            return resp.read()
         
         

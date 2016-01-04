@@ -385,10 +385,8 @@ class B2Fuse(Operations):
             file_hash = self.bucket.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
             self.open_files[path] = array.array('c',file_hash.encode("utf-8"))
         elif self.open_files.get(path) is None:
-            try:
-                self.open_files[path] = array.array('c',self.bucket.get_file(path))
-            except:
-                raise FuseOSError(errno.EACCES)
+            self.open_files[path] = array.array('c',self.bucket.get_file(path))
+  
         
         self.fd += 1
         return self.fd
