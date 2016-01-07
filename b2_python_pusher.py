@@ -17,31 +17,10 @@ import sys
 import urllib
 import urllib2
 
-USAGE = """
-Usage:
-
-    b2_python_pusher <accountId> <applicationKey> <bucketId> <folderName>
-
-Backs up the current directory, and everything in it, to B2 Cloud
-Storage.  
-
-The accountId and accountKey come from your account page at
-backblaze.com. 
-
-The bucket to store files in must already exist.  You can use
-the B2 command-line tool, b2, to create the bucket.
-
-The folderName is the prefix used for files backed up from the current
-folder.   If the folder name you give is "photos/backup" and one of
-the files in the current directory is named "kitten.jpg", the
-resulting file in B2 will be called "photos/backup/kitten.jpg".
-"""
-
 def b2_url_encode(s):
     """URL-encodes a unicode string to be sent to B2 in an HTTP header.
     """
     return urllib.quote(s.encode('utf-8'))
-
 
 def b2_url_decode(s):
     """Decodes a Unicode string returned from B2 in an HTTP header.
@@ -127,119 +106,4 @@ def make_account_key_auth(account_id, application_key):
     base_64_string = base64.b64encode('%s:%s' % (account_id, application_key))
     return 'Basic ' + base_64_string
 
-def back_up_directory(base_path, file_names, folder_name, 
-                      bucket_id, account_token,
-                      api_url, upload_url, upload_auth_token):
-    # Get the info on what's already backed up: a map from file name
-    # to mod time.
-    current_state = {}
-    state_file = base_path + '.b2_python_pusher'
-    try:
-        with open(state_file, 'r') as f:
-            current_state = json.loads(f.read())
-    except IOError as e:
-        pass
 
-    # Handle deleted files
-    gone = [name for name in current_state.keys() if name not in file_names]
-    for file_name in gone:
-        local_file_path = base_path + file_name
-        backup_file_path = folder_name + '/' + local_file_path
-        call_api(
-            api_url,
-            '/b2api/v1/b2_hide_file',
-            account_token,
-            { 'bucketId' : bucket_id, 'fileName' : backup_file_path }
-            )
-        del current_state[file_name]
-        print 'deleted: ', backup_file_path
-
-    # Check each of the files to see if they have changed, or are new.
-    for file_name in file_names:
-        local_file_path = base_path + file_name
-        backup_file_path = folder_name + '/' + local_file_path
-        mtime = os.path.getmtime(local_file_path)
-        if mtime != current_state.get(file_name, -1):
-            headers = {
-                'Authorization' : upload_auth_token,
-                'X-Bz-File-Name' : backup_file_path,
-                'Content-Type' : 'text/plain',   # XXX
-                'X-Bz-Content-Sha1' : hex_sha1_of_file(local_file_path)
-                }
-            file_info = post_file(upload_url, headers, local_file_path)
-            current_state[file_name] = mtime
-            print 'uploaded:', backup_file_path
-
-    # Save the state
-    with open(state_file, 'w') as f:
-        f.write(json.dumps(current_state, indent=4, sort_keys=True))
-        f.write('\n')
-    
-def main():
-    
-    auth_urls = {'-production':'https://api.backblaze.com'}
-
-    args = sys.argv[1:]
-    option = '-production'
-    api_url = auth_urls[option]    
-    while 0 < len(args) and args[0][0] == '-':
-        option = args[0]
-        args = args[1:]
-        if option in auth_urls:
-            api_url = auth_urls[option]
-            del sys.argv[1]
-            break
-        else:            
-            print 'ERROR: unknown option', option
-            print USAGE
-            sys.exit(1)
-    
-    if len(sys.argv) != 5:
-        print USAGE
-        sys.exit(1)
-
-    print 'Using %s %s' % (option[1:], api_url)
-
-    account_id = sys.argv[1]
-    application_key = sys.argv[2]
-    bucket_id = sys.argv[3]
-    folder_name = sys.argv[4]
-
-    # Authorize the account
-    account_auth = call_api(
-        api_url,
-        '/b2api/v1/b2_authorize_account',
-        make_account_key_auth(account_id, application_key),
-        {}
-        )
-    account_token = account_auth['authorizationToken']
-    api_url = account_auth['apiUrl']
-
-    # Get the upload URL
-    upload_info = call_api(
-        api_url,
-        '/b2api/v1/b2_get_upload_url',
-        account_token,
-        { 'bucketId' : bucket_id }
-        )
-    upload_url = upload_info['uploadUrl']
-    upload_auth_token = upload_info['authorizationToken']
-
-    # Walk down through all directories, starting at the current one,
-    # backing each one up.
-    encoding = sys.getfilesystemencoding()
-    for (dir_path, dir_names, file_names) in os.walk('.'):
-        file_names = set(fn.decode(encoding) for fn in file_names)
-        if '.b2_python_pusher' in file_names:
-            file_names.remove('.b2_python_pusher')
-        if dir_path == '.':
-            base_path = ''
-        else:
-            assert dir_path.startswith('./')
-            base_path = dir_path[2:] + '/'
-        back_up_directory(base_path, file_names, folder_name,
-                          bucket_id, account_token,
-                          api_url, upload_url, upload_auth_token)
-    
-if __name__ == '__main__':
-    main()

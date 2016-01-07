@@ -31,14 +31,12 @@ import errno
 import argparse
 import logging
 import array
-#['E2BIG', 'EACCES', 'EADDRINUSE', 'EADDRNOTAVAIL', 'EADV', 'EAFNOSUPPORT', 'EAGAIN', 'EALREADY', 'EBADE', 'EBADF', 'EBADFD', 'EBADMSG', 'EBADR', 'EBADRQC', 'EBADSLT', 'EBFONT', 'EBUSY', 'ECHILD', 'ECHRNG', 'ECOMM', 'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'EDEADLK', 'EDEADLOCK', 'EDESTADDRREQ', 'EDOM', 'EDOTDOT', 'EDQUOT', 'EEXIST', 'EFAULT', 'EFBIG', 'EHOSTDOWN', 'EHOSTUNREACH', 'EIDRM', 'EILSEQ', 'EINPROGRESS', 'EINTR', 'EINVAL', 'EIO', 'EISCONN', 'EISDIR', 'EISNAM', 'EL2HLT', 'EL2NSYNC', 'EL3HLT', 'EL3RST', 'ELIBACC', 'ELIBBAD', 'ELIBEXEC', 'ELIBMAX', 'ELIBSCN', 'ELNRNG', 'ELOOP', 'EMFILE', 'EMLINK', 'EMSGSIZE', 'EMULTIHOP', 'ENAMETOOLONG', 'ENAVAIL', 'ENETDOWN', 'ENETRESET', 'ENETUNREACH', 'ENFILE', 'ENOANO', 'ENOBUFS', 'ENOCSI', 'ENODATA', 'ENODEV', 'ENOENT', 'ENOEXEC', 'ENOLCK', 'ENOLINK', 'ENOMEM', 'ENOMSG', 'ENONET', 'ENOPKG', 'ENOPROTOOPT', 'ENOSPC', 'ENOSR', 'ENOSTR', 'ENOSYS', 'ENOTBLK', 'ENOTCONN', 'ENOTDIR', 'ENOTEMPTY', 'ENOTNAM', 'ENOTSOCK', 'ENOTSUP', 'ENOTTY', 'ENOTUNIQ', 'ENXIO', 'EOPNOTSUPP', 'EOVERFLOW', 'EPERM', 'EPFNOSUPPORT', 'EPIPE', 'EPROTO', 'EPROTONOSUPPORT', 'EPROTOTYPE', 'ERANGE', 'EREMCHG', 'EREMOTE', 'EREMOTEIO', 'ERESTART', 'EROFS', 'ESHUTDOWN', 'ESOCKTNOSUPPORT', 'ESPIPE', 'ESRCH', 'ESRMNT', 'ESTALE', 'ESTRPIPE', 'ETIME', 'ETIMEDOUT', 'ETOOMANYREFS', 'ETXTBSY', 'EUCLEAN', 'EUNATCH', 'EUSERS', 'EWOULDBLOCK', 'EXDEV', 'EXFULL', '__doc__', '__name__', '__package__', 'errorcode']
-
 
 from fuse import FUSE, FuseOSError, Operations
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from time import time
 
-from b2bucket import B2Bucket
+from b2bucket_cached import B2BucketCached
        
 
 class DirectoryStructure(object):
@@ -86,10 +84,10 @@ def load_config():
     with open("config.yaml") as f:
         import yaml
         return yaml.load(f.read())
-        
+
 
 class B2Fuse(Operations):
-    def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=True, memory_limit=128):
+    def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=False, memory_limit=128):
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
         config = load_config()
@@ -103,7 +101,7 @@ class B2Fuse(Operations):
         if not bucket_id:
             bucket_id = config['bucketId']
             
-        self.bucket = B2Bucket(account_id, application_key, bucket_id)  
+        self.bucket = B2BucketCached(account_id, application_key, bucket_id)  
         
         self.directories = DirectoryStructure()
         self.local_directories = []
@@ -117,7 +115,11 @@ class B2Fuse(Operations):
         
         self.fd = 0
         
+    def __enter__(self):
+        return self
         
+    def __exit__(self, *args, **kwargs):
+        self.bucket.__exit__()
         
     # Filesystem methods
     # ==================
@@ -479,7 +481,8 @@ def create_parser():
     return parser
     
 def main(mountpoint, account_id, application_key, bucket_id):
-    FUSE(B2Fuse(account_id, application_key, bucket_id), mountpoint, nothreads=True, foreground=True)
+    with B2Fuse(account_id, application_key, bucket_id) as filesystem:
+        FUSE(filesystem, mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
