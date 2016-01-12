@@ -3,6 +3,7 @@
 ### Version: 1.1
 
 #### Warning this software may contain bugs, be careful of using it with important data.
+#### Please report bugs, use case issue and feature requests through the Github issue tracker
 
 ### Basic setup:
 
