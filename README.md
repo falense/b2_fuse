@@ -1,6 +1,6 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.1
+### Version: 1.2 - Beta
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 #### Please report bugs, use-case issues and feature requests through the Github issue tracker
@@ -22,13 +22,7 @@ sudo apt-get install python-pip
 sudo pip install fusepy
 ```
 
-Usage:
-
-```
-python b2_fuse.py <mountpoint>
-```
-
-Config file example ("config.yaml"):
+An example config ("config.yaml"):
 
 ```
 accountId: <youraccountid>
@@ -36,7 +30,15 @@ applicationKey: <yourapplicationid>
 bucketId: <yourbucketid>
 ```
 
-### Usage notes:
+### Online only copy
+
+This FUSE driver can be used either with a (small) memory backing for current open files or a complete local copy. In order to use the FUSE driver as an interface to the online service B2 (with no local copy) use:
+
+```
+python b2fuse.py <mountpoint>
+```
+
+Usage notes:
 
 * Can be used as a regular filesystem, but should not (high latency)
 * Files are cached in memory. If you write or read very large files this may cause issues (you are limited by available ram)
@@ -44,6 +46,20 @@ bucketId: <yourbucketid>
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 * Having many files in a bucket (multiples of 1000) will drastically increase the startup time/mount time. 
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
+
+### With local copy
+
+If you wish to try the local copy variant, this requires a folder to store the local replica in addition to the mountpoint you wish to use. 
+
+```
+python b2local.py <local_directory> <mountpoint>
+```
+
+Usage notes:
+
+* Threaded uploads and deletions, large files will cause problems as splitting uploads is not yet supported
+* Changes will only take effect online after 15+ seconds. This is a timeout in order to handle multiple successive closures and flushing of the same file. 
+* First synchronization will take a long time, threading for this is not yet implemented. 
 
 ### Application specific notes:
 
