@@ -207,23 +207,23 @@ class B2Local(Operations):
         try:
             file_list = self.bucket._list_dir()
             
-            #for i, file_info in enumerate(file_list):
-                #rel_filename = file_info['fileName']
-                #upload_time =  file_info['uploadTimestamp']/1000
+            for i, file_info in enumerate(file_list):
+                rel_filename = file_info['fileName']
+                upload_time =  file_info['uploadTimestamp']/1000
                 
-                #filename = os.path.join(self.local_root, rel_filename)
+                filename = os.path.join(self.local_root, rel_filename)
                 
-                #percent = (i+1)*100/len(file_list)
-                #if percent % 10 == 0:
-                    #print "{0:.0f}%".format(percent)
+                percent = (i+1)*100/len(file_list)
+                if percent % 10 == 0:
+                    print "{0:.0f}%".format(percent)
                 
-                #if os.path.exists(filename):
-                    #continue
+                if os.path.exists(filename):
+                    continue
                     
-                #self.logger.debug("New file found in B2 (%s)" % rel_filename)
+                self.logger.debug("New file found in B2 (%s)" % rel_filename)
                 
-                #self.download_file(rel_filename, filename)
-                #os.utime(filename, (upload_time,upload_time))
+                self.download_file(rel_filename, filename)
+                os.utime(filename, (upload_time,upload_time))
                     
             for i, file_info in enumerate(file_list):
                 rel_filename = file_info['fileName']
