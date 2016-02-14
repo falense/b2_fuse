@@ -14,106 +14,121 @@ class B2BucketThreaded(B2Bucket):
         super(B2BucketThreaded, self).__init__( *args)
         
         num_threads=50
-        self.upload_queue = LifoQueue(num_threads*2)
-        self.delete_queue = LifoQueue(num_threads*2)
+        self.queue = LifoQueue(num_threads*2)
         
         self.file_locks = defaultdict(Lock)
         
         self.running = True
         
-        self.upload_threads = []
-        print "Starting upload thread ",
+        self.threads = []
+        print "Thread ",
         for i in xrange(num_threads):
-            t = threading.Thread(target=self._file_pusher)
+            t = threading.Thread(target=self._file_updater)
             t.start()
-            self.upload_threads.append(t)
+            self.threads.append(t)
             
             print ".",
             
         print 
-            
-        self.delete_threads = []
-        print "Starting delete thread ",
-        for i in xrange(num_threads):
-            t = threading.Thread(target=self._file_deleter)
-            t.start()
-            self.delete_threads.append(t)
-            
-            print ".",
-            
-        print 
+        
+        self.pre_queue_lock = Lock()
+        self.pre_queue_running = True
+        self.pre_queue = LifoQueue(num_threads*2)
+        
+        self.pre_file_dict = {}
+        
+        self.pre_thread = threading.Thread(target=self._prepare_update)
+        self.pre_thread.start()
+        
+        
     
-    def _file_pusher(self):
+    def _prepare_update(self):
+        while self.pre_queue_running:
+            try:
+                filename, operation, data  = self.pre_queue.get(True,1)
+                self.pre_file_dict[filename] = (time(), operation, data)
+                self.pre_queue.task_done()
+            except Empty:
+                for filename, (timestamp, operation, data) in self.pre_file_dict.items():
+                    if time()-timestamp > 15:
+                        self.queue.put((filename, operation, data))
+                    
+                        del self.pre_file_dict[filename]
+        
+        for filename, (timestamp, operation, data) in self.pre_file_dict.items():
+            self.queue.put((filename, operation, data))
+            del self.pre_file_dict[filename]
+            
+    def _file_updater(self):
         while self.running:
             try:
-                filename, data  = self.upload_queue.get(True,1)
+                filename, operation, data  = self.queue.get(True,1)
             except Empty:
                 continue
             
-            super(B2BucketThreaded,self)._put_file(filename, data)
-            self.upload_queue.task_done()
-            self.file_locks[filename].release()
+            
+            with self.file_locks[filename]:
+                if operation == "deletion":
+                    super(B2BucketThreaded,self)._delete_file(filename)
+                    self.queue.task_done()
+                    
+                elif operation == "upload":
+                    super(B2BucketThreaded,self)._put_file(filename, data)
+                    self.queue.task_done()
+                    
+                else:
+                    self.logger.error("Invalid operation %s on %s" % (operation, filename))
                 
-    def _file_deleter(self):        
-        while self.running:
-            try:
-                filename  = self.delete_queue.get(True,1)
-            except Empty:
-                continue
             
-            super(B2BucketThreaded,self)._delete_file(filename)
-            self.delete_queue.task_done()
-            self.file_locks[filename].release()
     
     def __enter__(self):
         return self
         
     def __exit__(self, *args, **kwargs):
-        
         self.logger.info("Waiting for all B2 requests to complete")
-        self.sync()
         
+        self.logger.info("Pre-Queue contains %s elements", self.pre_queue.qsize())
+        self.pre_queue.join()
+        
+        self.logger.info("Joining pre queue thread")
+        self.pre_queue_running = False
+        self.pre_thread.join()
+        
+        self.logger.info("Queue contains %s elements", self.queue.qsize())
+        self.queue.join()
+        
+        self.logger.info("Joining threads")
         self.running = False
-        
-        self.logger.info("Joining upload threads")
-        for t in self.upload_threads:
+        for t in self.threads:
             t.join()
             
-        self.logger.info("Joining deletion threads")
-        for t in self.delete_threads:
-            t.join()
+            
             
     def put_file(self, filename, data):
-        self.logger.info("Postponing upload of %s (%s)", filename, len(data))
-        self.file_locks[filename].acquire()
-        
-        self.upload_queue.put((filename, data), True)
-        
-        new_file = {}
-        new_file['fileName'] = filename
-        new_file['fileId'] = None
-        new_file['uploadTimestamp'] = time()
-        new_file['action'] = 'upload'
-        new_file['contentLength'] = len(data)
+        with self.pre_queue_lock:
+            self.logger.info("Postponing upload of %s (%s)", filename, len(data))
             
-        return new_file
+            self.pre_queue.put((filename, "upload", data), True)
+            
+            new_file = {}
+            new_file['fileName'] = filename
+            new_file['fileId'] = None
+            new_file['uploadTimestamp'] = time()
+            new_file['action'] = 'upload'
+            new_file['contentLength'] = len(data)
+                
+            return new_file
         
     def delete_file(self, filename):  
-        self.file_locks[filename].acquire()
-         
-        self.logger.info("Postponing deletion of %s", filename)
-        self.delete_queue.put((filename),True)
-        
+        with self.pre_queue_lock:
+            self.logger.info("Postponing deletion of %s", filename)
+            self.pre_queue.put((filename, "deletion", None),True)
+            
     
     def get_file(self, filename):
         with self.file_locks[filename]:
             return super(B2BucketThreaded,self).get_file(filename)
     
-    def sync(self):
-        self.logger.info("Upload queue contains %s elements", self.upload_queue.qsize())
-        self.logger.info("Deletion queue contains %s elements",  self.delete_queue.qsize())
-        self.upload_queue.join()
-        self.delete_queue.join()
         
 
         

@@ -48,7 +48,7 @@ def load_config():
         return yaml.load(f.read())
 
 class B2Local(Operations):
-    def __init__(self, local_root, account_id = None, application_key = None, bucket_id = None, memory_limit=128):
+    def __init__(self, local_root, account_id = None, application_key = None, bucket_id = None):
         self.local_root = local_root
         self.rwlock = Lock()
         
@@ -65,9 +65,8 @@ class B2Local(Operations):
         if not bucket_id:
             bucket_id = config['bucketId']
             
-        self.bucket = ThreadedB2Bucket(account_id, application_key, bucket_id)  
+        self.bucket = B2BucketThreaded(account_id, application_key, bucket_id)  
         
-        self.memory_limit = memory_limit
         
     def access(self, path, mode):
         path = os.path.join(self.local_root, path[1:])
@@ -131,11 +130,14 @@ class B2Local(Operations):
     #readlink = os.readlink
 
     def release(self, path, fh):
-        path = os.path.join(self.local_root, path[1:])
         r = os.close(fh)
-        with open(path, "rb") as f:
-            data = f.read()
-            self.bucket.put_file(path, data)
+        
+        if path.startswith("/"):
+            path = path[1:]
+        
+        abs_path = os.path.join(self.local_root, path)
+        
+        self.upload_file(path, abs_path)
         
         return r
 
@@ -203,7 +205,6 @@ class B2Local(Operations):
         return sha1.hexdigest()
     
     def sync_folder(self):
-        print "Syncing"
         try:
             file_list = self.bucket._list_dir()
             
@@ -233,7 +234,7 @@ class B2Local(Operations):
                 local_modtime = getattr(os.lstat(filename), "st_mtime")
                     
                 #Local copy is newer
-                if local_modtime-upload_time > 1:                    
+                if local_modtime-upload_time > 60:                    
                     b2_hash = self.bucket.get_file_info_detailed(rel_filename)['contentSha1']
                     local_hash = self.sha1_file(filename)
             
@@ -250,7 +251,7 @@ class B2Local(Operations):
                         os.utime(filename, (upload_time,upload_time))
                         
                 #Online copy is newer
-                elif upload_time-local_modtime > 5:                    
+                elif upload_time-local_modtime > 60:                    
                     b2_hash = self.bucket.get_file_info_detailed(rel_filename)['contentSha1']
                     local_hash = self.sha1_file(filename)
                         
@@ -272,6 +273,7 @@ class B2Local(Operations):
     
 def create_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument("local_directory", type=str, help="Directory for local copy of data")
     parser.add_argument("mountpoint", type=str, help="Mountpoint for the B2 bucket")
     
     parser.add_argument("--account_id", type=str, default=None, help="Account ID for your B2 account (overrides config)")
@@ -279,8 +281,8 @@ def create_parser():
     parser.add_argument("--bucket_id", type=str, default=None, help="Bucket ID for the bucket to mount (overrides config)")
     return parser
     
-def main(mountpoint, account_id, application_key, bucket_id):
-    with B2Local("testdir",account_id, application_key, bucket_id) as filesystem:
+def main(local_directory, mountpoint, account_id, application_key, bucket_id):
+    with B2Local(local_directory,account_id, application_key, bucket_id) as filesystem:
         FUSE(filesystem, mountpoint, foreground=True, nothreads=True)
 
 if __name__ == '__main__':
@@ -288,4 +290,4 @@ if __name__ == '__main__':
     
     parser = create_parser()
     args = parser.parse_args()
-    main(args.mountpoint, args.account_id, args.application_key, args.bucket_id)
+    main(args.local_directory, args.mountpoint, args.account_id, args.application_key, args.bucket_id)
