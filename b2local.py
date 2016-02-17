@@ -32,6 +32,7 @@ import argparse
 import logging
 import array
 import hashlib
+import threading
 
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from stat import S_IFDIR, S_IFLNK, S_IFREG
@@ -203,10 +204,16 @@ class B2Local(Operations):
                 sha1.update(data)
                 
         return sha1.hexdigest()
-    
+        
+    def _download_thread(self, b2_filename, local_filename, upload_time):
+        self.download_file(b2_filename, local_filename)
+        os.utime(local_filename, (upload_time,upload_time))
+        
     def sync_folder(self):
         try:
             file_list = self.bucket._list_dir()
+            
+            download_threads = []
             
             for i, file_info in enumerate(file_list):
                 rel_filename = file_info['fileName']
@@ -223,9 +230,15 @@ class B2Local(Operations):
                     
                 self.logger.debug("New file found in B2 (%s)" % rel_filename)
                 
-                self.download_file(rel_filename, filename)
-                os.utime(filename, (upload_time,upload_time))
-                    
+                
+                t = threading.Thread(target=self._download_thread, args=(rel_filename, filename, upload_time,))
+                t.start()
+                
+                download_threads.append(t)
+            
+            for t in download_threads:
+                t.join()
+            
             for i, file_info in enumerate(file_list):
                 rel_filename = file_info['fileName']
                 upload_time =  file_info['uploadTimestamp']/1000

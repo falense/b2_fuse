@@ -140,9 +140,9 @@ class B2BucketCached(B2Bucket):
             result = super(B2BucketCached, self)._get_file_versions(filename)
             return self._update_cache(func_name, result, func_params)
 
-    def delete_file(self,  *args):  
+    def delete_file(self,  filename, *args):  
         self.cache['_list_dir'].remove_file(filename)
-        return super(B2BucketCached, self)._delete_file(*args)
+        return super(B2BucketCached, self)._delete_file(filename, *args)
     
     def put_file(self, *args):
         file_info = super(B2BucketCached, self)._put_file(*args)

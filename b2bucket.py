@@ -201,4 +201,9 @@ class B2Bucket(object):
         
 
 
-    
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, *args, **kwargs):
+        pass
+            

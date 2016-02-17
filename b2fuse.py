@@ -361,9 +361,14 @@ class B2Fuse(Operations):
         if old in self.dirty_files:
             self.dirty_files.remove(old)
             
-        self.open_files[new] = self.open_files[old]
-        self.dirty_files.add(new)
-        self.flush(new, 0)
+        self.open(old,0)
+        data = self.open_files[old]
+        self.release(old,0)
+            
+        self.create(new,0)
+        self.write(new, self.open_files[old], 0, 0)
+        self.release(new, 0)
+        
         self.unlink(old)
 
     #def link(self, target, name):
