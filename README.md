@@ -1,6 +1,6 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.2 - Beta
+### Version: 1.2
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 #### Please report bugs, use-case issues and feature requests through the Github issue tracker
