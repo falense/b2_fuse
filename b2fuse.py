@@ -447,6 +447,8 @@ class B2Fuse(Operations):
             path = path[1:]
             
         if path not in self.dirty_files:
+            
+            self.logger.debug("File not dirty, skipping upload")
             return 
             
         filename = path.split("/")[-1]

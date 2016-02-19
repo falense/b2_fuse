@@ -30,7 +30,7 @@ class Cache(object):
         
 #Special cache used to handle the addition and deletion of files more effciently.
 class FileCache(Cache):
-    def add_file(self, upload_resp):
+    def add_file(self, upload_resp):        
         new_file = {}
         new_file['fileName'] = upload_resp['fileName']
         new_file['fileId'] = upload_resp['fileId']
@@ -40,9 +40,19 @@ class FileCache(Cache):
         
         for key, (timestamp,value) in self.data.items():
             if new_file['fileName'].startswith(key):
-                value.append(new_file)
-                new_item = (timestamp, value)
-                self.data[key] =  new_item
+                found = -1
+                
+                for i, cached_file in enumerate(value):
+                    if cached_file['fileName'] == new_file['fileName']:
+                        found = i
+                
+                if found == -1:
+                    value.append(new_file)
+                else:
+                    value[found] = new_file
+                    
+                self.data[key] = (timestamp, value)
+                    
                 
     def remove_file(self, filename):
         for key, (timestamp,value) in self.data.items():
