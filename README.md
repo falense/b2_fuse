@@ -59,7 +59,7 @@ Usage notes:
 
 * Threaded uploads and deletions, large files will cause problems as splitting uploads is not yet supported
 * Changes will only take effect online after 15+ seconds. This is a timeout in order to handle multiple successive closures and flushing of the same file. 
-* First synchronization will take a long time, threading for this is not yet implemented. 
+* First synchronization will take a long time. Threading speeds up the process, but FUSE driver will not respond to filesystem requests before synchronization is complete.
 
 ### Application specific notes:
 
@@ -95,10 +95,6 @@ encfs <bucket_mountpoint> <encrypted_filesystem>
 * Concurrent access from multiple client will lead to inconsistent results
 * Small files give low read/write performance (due to high latency)
 
-### Future improvements:
-
-* Use bucket name, instead of bucket id
-* Command line parameter to enable ".sha1" files
 
 
 License: MIT license
