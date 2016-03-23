@@ -33,6 +33,7 @@ import logging
 import array
 import hashlib
 import threading
+import shutil
 
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from stat import S_IFDIR, S_IFLNK, S_IFREG
@@ -41,6 +42,7 @@ from b2bucket_threaded import B2BucketThreaded
 from errno import EACCES
 from threading import Lock
 from collections import defaultdict
+
 
 
 def load_config():
@@ -184,7 +186,7 @@ class B2Local(Operations):
         
         folder = os.path.dirname(local_filename)
         if not os.path.exists(folder):
-            os.mkdir(folder)
+            os.makedirs(folder)
         
         with open(local_filename,"wb") as f:
             f.write(data)
@@ -208,6 +210,16 @@ class B2Local(Operations):
     def _download_thread(self, b2_filename, local_filename, upload_time):
         self.download_file(b2_filename, local_filename)
         os.utime(local_filename, (upload_time,upload_time))
+        
+    def _list_files(self, directory):
+        file_paths = [] 
+        for root, directories, files in os.walk(directory):
+            for filename in files:
+                filepath = os.path.join(root, filename)
+                file_paths.append(filepath)
+
+        return file_paths
+
         
     def sync_folder(self):
         try:
@@ -248,7 +260,7 @@ class B2Local(Operations):
                     
                 #Local copy is newer
                 if local_modtime-upload_time > 60:                    
-                    b2_hash = self.bucket.get_file_info_detailed(rel_filename)['contentSha1']
+                    b2_hash = self.bucket.get_file_info(rel_filename)['contentSha1']
                     local_hash = self.sha1_file(filename)
             
                     #If hash is different, upload new file
@@ -264,15 +276,32 @@ class B2Local(Operations):
                         os.utime(filename, (upload_time,upload_time))
                         
                 #Online copy is newer
-                elif upload_time-local_modtime > 60:                    
-                    b2_hash = self.bucket.get_file_info_detailed(rel_filename)['contentSha1']
-                    local_hash = self.sha1_file(filename)
-                        
-                    #If hashes differ, download new version from cloud
-                    if local_hash != b2_hash:
-                        self.download_file(rel_filename, filename)
+                elif upload_time-local_modtime > 60:         
+                    self.logger.debug("Online version newer (%s)" % rel_filename)     
+                    
+                    ignore_newer_online = True
+                    
+                    if not ignore_newer_online:
+                        b2_hash = self.bucket.get_file_info(rel_filename)['contentSha1']
+                        local_hash = self.sha1_file(filename)
+                            
+                        #If hashes differ, download new version from cloud
+                        if local_hash != b2_hash:
+                            self.download_file(rel_filename, filename)
                         
                     os.utime(filename, (upload_time,upload_time))
+            
+            prefix_length = len(self.local_root)
+                
+            #if self.local_root.endswith("/"):
+                #prefix_length = prefix_length+1
+                
+            local_file_list = map(lambda x: x[prefix_length:], self._list_files(self.local_root))
+            local_only_files = list(set(local_file_list)-set(map(lambda x: x['fileName'],file_list)))
+
+            for i, rel_filename in enumerate(local_only_files):
+                filename = os.path.join(self.local_root, rel_filename)
+                self.upload_file(rel_filename, filename)
                 
         except KeyboardInterrupt:
             pass

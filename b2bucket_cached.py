@@ -102,16 +102,6 @@ class B2BucketCached(B2Bucket):
     
     
     #File listint calls
-    
-    def get_file_info_detailed(self, filename):
-        func_name = "get_file_info_detailed"
-        func_params = (filename)
-        
-        try:
-            return self._get_cache(func_name, func_params)
-        except CacheNotFound:
-            result = super(B2BucketCached, self)._get_file_info_detailed(filename)
-            return self._update_cache(func_name, result, func_params)
 
     
     def _list_dir(self, startFilename=""):
@@ -151,12 +141,14 @@ class B2BucketCached(B2Bucket):
             return self._update_cache(func_name, result, func_params)
 
     def delete_file(self,  filename, *args):  
-        self.cache['_list_dir'].remove_file(filename)
+        if self.cache.get('_list_dir') is not None:
+            self.cache['_list_dir'].remove_file(filename)
         return super(B2BucketCached, self)._delete_file(filename, *args)
     
     def put_file(self, *args):
         file_info = super(B2BucketCached, self)._put_file(*args)
-        self.cache['_list_dir'].add_file(file_info)
+        if self.cache.get('_list_dir') is not None:
+            self.cache['_list_dir'].add_file(file_info)
         return file_info
             
     def get_file(self, *args):

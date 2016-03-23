@@ -1,5 +1,6 @@
 import logging
 import threading
+import sys
 
 from time import time
 from Queue import LifoQueue, Empty
@@ -8,7 +9,8 @@ from collections import defaultdict
 
 from b2_python_pusher import *
 
-
+class UploadFailed(Exception):
+    pass
 
 #Basic B2 Bucket access. Not cached and not thread safe
 class B2Bucket(object):
@@ -82,13 +84,16 @@ class B2Bucket(object):
         resp = call_api(self.api_url, api_call, self.account_token, call_params)
         result = resp['files']
         nextFilename = resp['nextFileName']
+    
+        
         while len(resp['files']) == 1000 and nextFilename.startswith(startFilename):
             call_params['startFileName'] = nextFilename
             resp = call_api(self.api_url, api_call, self.account_token, call_params)
             result.extend(resp['files'])
             nextFilename = resp['nextFileName']
             
-            print resp
+            
+            self.logger.info("File listing contains %s elements (s:%s)", len(result), sys.getsizeof(result[0]))
             
         return result
         
@@ -115,23 +120,32 @@ class B2Bucket(object):
         
         return  filtered_files 
         
-    def _put_file(self, filename, data):
+    def _put_file(self, filename, data, upload_tokenurl=None, delete_before_push=True):
         func_name = "_put_file"
         self.logger.info("%s %s (len:%s)", func_name, filename, len(data))
         
-        self._delete_file(filename)
+        if delete_before_push:
+            self._delete_file(filename)
+            
+        if upload_tokenurl is None:
+            upload_auth_token, upload_url = self.upload_auth_token, self.upload_url
+        else:
+            upload_auth_token, upload_url = upload_tokenurl
         
         headers = {
-            'Authorization' : self.upload_auth_token,
+            'Authorization' : upload_auth_token,
             'X-Bz-File-Name' : filename,
             'Content-Type' : 'b2/x-auto', 
             'X-Bz-Content-Sha1' : hashlib.sha1(data).hexdigest(),
             'Content-Length' : str(len(data))
             }
         
-        encoded_headers = self._encode_headers(headers)
+        try:
+            encoded_headers = self._encode_headers(headers)
+        except UnicodeDecodeError:
+            raise UploadFailed()
         
-        with OpenUrl(self.upload_url.encode('ascii'), data, encoded_headers) as response_file:
+        with OpenUrl(upload_url.encode('ascii'), data, encoded_headers) as response_file:
             json_text = response_file.read()
             file_info = json.loads(json_text)
             

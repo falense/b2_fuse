@@ -6,7 +6,7 @@ from Queue import LifoQueue, Empty
 from threading import Lock
 from collections import defaultdict
 
-from b2bucket import B2Bucket
+from b2bucket import *
   
 #Threaded operations, memory only
 class B2BucketThreaded(B2Bucket): 
@@ -60,6 +60,7 @@ class B2BucketThreaded(B2Bucket):
             del self.pre_file_dict[filename]
             
     def _file_updater(self):
+        upload_url = self._get_upload_url()
         while self.running:
             try:
                 filename, operation, data  = self.queue.get(True,1)
@@ -73,7 +74,10 @@ class B2BucketThreaded(B2Bucket):
                     self.queue.task_done()
                     
                 elif operation == "upload":
-                    super(B2BucketThreaded,self)._put_file(filename, data)
+                    try:
+                        super(B2BucketThreaded,self)._put_file(filename, data, upload_url, False)
+                    except UploadFailed:
+                        self.logger.error("Failed to upload %s" % filename)
                     self.queue.task_done()
                     
                 else:
