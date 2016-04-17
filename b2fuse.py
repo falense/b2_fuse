@@ -84,7 +84,288 @@ def load_config():
     with open("config.yaml") as f:
         import yaml
         return yaml.load(f.read())
+        
+class B2BaseFile(object):
+    def __init__(self, b2fuse, path):
+        self.b2fuse = b2fuse
+        
+        self.path = path
+        
+    def __getitem__(self, key):
+        raise NotImplemented()
+        
+    def __setitem__(self, key, value):
+        raise NotImplemented()
+        
+    def __len__(self):
+        raise NotImplemented()
+        
+    def delete(self):
+        raise NotImplemented()
+        
+        
+        
+    def upload(self):
+        raise NotImplemented()
+        
+    def __del__(self):
+        self.delete()
+        
+class B2HashFile(object):
+    def __init__(self, b2fuse, path):
+        self.b2fuse = b2fuse
+        
+        file_hash = self.bucket.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
+        self.data = array.array('c',file_hash.encode("utf-8"))
+        
+    #def __getitem__(self, key):
+    #    if isinstance(key, slice):
+    #        return self.data[key.start:key.stop] 
+    #    return self.data[key]
+        
+    #def __getslice__(self, i, j):
+    #    return self.__getitem__(slice(i, j))
+        
+        
+    def __len__(self):
+        return len(self.data)
+        
+    def upload(self):
+        return
+        
+    def write(self, offset, data):
+        return
+        
+    def read(self, offset, length):
+        return
+        
 
+class B2FileMemory(B2BaseFile):
+    def __init__(self, b2fuse, path, new_file=False):
+        super(B2FileMemory, self).__init__(b2fuse, path)
+        
+        self._dirty = False
+        if new_file:
+            self.data = array.array('c')
+            self._dirty = True
+        else:
+            self.data = array.array('c',self.b2fuse.bucket.get_file(path))
+        
+    #def __getitem__(self, key):
+        #if isinstance(key, slice):
+            #return self.data[key.start:key.stop] 
+        #return self.data[key]
+        
+    def upload(self):
+        if self._dirty:
+            self.b2fuse.bucket.put_file(self.path, self.data)
+        
+        self._dirty = False
+        
+    #def __setitem__(self, key, value):
+    #    self.data[key] = value
+        
+    def __len__(self):
+        return len(self.data)
+        
+    #def __del__(self):
+    #    self.delete()
+        
+    def write(self, offset, data):
+        if offset == len(self):
+            self.data.extend(data)
+        else:
+            self.open_files[path] = self.open_files[path][:offset] + array.array('c', data) + self.open_files[path][offset+len(data):]
+            
+    def read(self, offset, length):
+        return self.data[offset: offset+length]
+        
+    def truncate(self, length):
+        self.data = self.data[:length]
+        
+    def set_dirty(self, new_value):
+        self._dirty = new_value
+        
+    def delete(self):
+        del self.data
+    
+class B2FileLargeMemory(B2BaseFile):
+    def __init__(self, b2fuse, path, new_file=False):
+        super(B2FileLargeMemory, self).__init__(b2fuse, path)
+        
+        self._dirty = False
+        if new_file:
+            self.data = [array.array('c')]
+            self._dirty = True
+            
+            self.file_parts = [True] 
+        else:
+             #array.array('c')#,self.b2fuse.bucket.get_file(path))
+            
+            size = self.b2fuse.bucket.get_file_info(path)['size']
+            num_file_parts = 1 + size/(int(self.b2fuse.file_download_split)*1024**2)
+            self.file_parts = [False] * num_file_parts
+            self.data = [None]* num_file_parts
+        
+        
+    #def __getitem__(self, key):
+        #if isinstance(key, slice):
+            #return self.data[key.start:key.stop] 
+        #return self.data[key]
+        
+    def upload(self):
+        
+        if self._dirty:
+            self.b2fuse.bucket.put_file(self.path, self.read(0, len(self)))
+        
+        self._dirty = False
+        
+    #def __setitem__(self, key, value):
+    #    self.data[key] = value
+        
+    def __len__(self):
+        total_length = 0
+        
+        for part in range(len(self.file_parts)):
+            total_length += len(self.file_parts[part])
+            
+        return total_length
+        
+    #def __del__(self):
+    #    self.delete()
+        
+    def write(self, offset, data):
+        if offset == len(self):
+            
+            part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+            
+            start_part = int(offset)/part_bytes
+            
+            
+            
+            end_part = int(end_index)/part_bytes
+            
+            
+            
+            self.data.extend(data)
+        else:
+            raise NotImplemented("Random write")
+            #self.open_files[path] = self.open_files[path][:offset] + array.array('c', data) + self.open_files[path][offset+len(data):]
+            
+    def _data_available(self, start_index, end_index):
+        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+        
+        start_part = int(start_index)/part_bytes
+        end_part = int(end_index)/part_bytes
+        
+        for part in range(start_part, end_part+1, 1):
+            if not self.file_parts[part]:
+                return False
+                
+        return True
+                
+        
+            
+    def _fetch_parts(self, start_index, end_index):
+        print "Fetching parts"
+        
+        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+        
+        start_part = int(start_index)/part_bytes
+        end_part = int(end_index)/part_bytes
+        
+        for part in range(start_part, end_part+1, 1):
+            print part,
+            if not self.file_parts[part]:
+                i_start = part*part_bytes
+                i_end = (part+1)*part_bytes - 1
+                
+                temp_data = self.b2fuse.bucket.get_file(self.path, byte_range=(i_start,i_end))
+                self.data[part] = array.array("c", temp_data)
+        
+        print
+    def read(self, offset, length):
+
+        if not self._data_available(offset,offset+length):
+            self._fetch_parts(offset, offset+length)
+            
+        
+        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+        
+        start_part = int(offset)/part_bytes
+        end_part = int(offset+length)/part_bytes
+        
+        
+        
+        chunk_start_index = offset % part_bytes
+        
+        temp_length = min(length, part_bytes)
+        temp_data = self.data[start_part][chunk_start_index:chunk_start_index + temp_length]
+        chunk = array.array('c', temp_data)
+        
+        if length > (part_bytes - chunk_start_index):
+            for part in range(start_part+1, end_part, 1):
+                chunk.extend(self.data[part])
+                
+            chunk_end_index = (offset+length) %  part_bytes
+            if chunk_end_index != 0:
+                chunk.extend(self.data[end_part][:chunk_end_index])
+                
+        return chunk
+            
+        
+    def truncate(self, length):
+        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+        end_part = int(length)/part_bytes
+        
+        self.data = self.data[:end_part]
+        
+        end_offset = length % part_bytes
+        self.data[end_part] = self.data[end_part][:end_offset]
+        
+    def set_dirty(self, new_value):
+        self._dirty = new_value
+        
+    def delete(self):
+        del self.data
+
+class B2FileDisk(object):
+    def __init__(self, b2fuse, path):
+        self.b2fuse = b2fuse
+        
+        self.temp_filename = os.path.join(self.b2fuse.temp_folder, path)
+        os.makedirs(self.temp_filename)
+        
+        self.temp_file = open(self.temp_filename, "wr+b")
+        data = self.b2fuse.bucket.get_file(path)
+        
+        self.temp_file.write(data)
+        
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            self.temp_file.seek(key.start)
+            return array.array('c',self.temp_file.read(key.stop-key.start))
+        
+        self.temp_file.seek(key)
+        return array.array('c',self.temp_file.read(1))
+        
+    #def __getslice__(self, i, j):
+    #    return self.__getitem__(slice(i, j))
+        
+    def __len__(self):
+        return os.path.getsize(self.temp_filename)
+        
+        
+    def delete(self):
+        os.remove(self.temp_filename)
+        
+    def __del__(self):
+        self.delete()
+        
+        
+import shutil
+
+B2File = B2FileLargeMemory
 
 class B2Fuse(Operations):
     def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=False, memory_limit=128):
@@ -101,14 +382,21 @@ class B2Fuse(Operations):
         if not bucket_id:
             bucket_id = config['bucketId']
             
+        self.file_download_split = config['fileDownloadSplit']
+        self.big_file_upload_split = config['bigFileUploadSplit']
+        self.temp_folder = config['tempFolder']
+        
+        if os.path.exists(self.temp_folder):
+            shutil.rmtree(self.temp_folder)
+        
+        os.makedirs(self.temp_folder)
+            
         self.bucket = B2BucketCached(account_id, application_key, bucket_id)  
         
         self.directories = DirectoryStructure()
         self.local_directories = []
           
-        self.open_files = defaultdict(bytes)
-        self.dirty_files = set()
-        self.closed_files = set()
+        self.open_files = defaultdict(B2File)
         
         self.enable_hashfiles = enable_hashfiles
         self.memory_limit = memory_limit
@@ -155,11 +443,11 @@ class B2Fuse(Operations):
             
         raise FuseOSError(errno.EACCES)
         
-    def chmod(self, path, mode):
-        self.logger.debug("Chmod %s (mode:%s)", path, mode)
+    #def chmod(self, path, mode):
+    #    self.logger.debug("Chmod %s (mode:%s)", path, mode)
 
-    def chown(self, path, uid, gid):
-        self.logger.debug("Chown %s (uid:%s gid:%s)", path, uid, gid)
+    #def chown(self, path, uid, gid):
+    #    self.logger.debug("Chown %s (uid:%s gid:%s)", path, uid, gid)
         
     def getattr(self, path, fh=None):
         self.logger.debug("Get attr %s", path)
@@ -320,11 +608,10 @@ class B2Fuse(Operations):
 
     def _remove_local_file(self, path):
         if path in self.open_files.keys():
-            if path in self.dirty_files:
-                self.dirty_files.remove(path)
+            self.open_files[path].remove()
+            
             del self.open_files[path]
-            if path in self.closed_files:
-                self.closed_files.remove(path)
+
             
 
     def unlink(self, path):
@@ -389,10 +676,9 @@ class B2Fuse(Operations):
             raise FuseOSError(errno.EACCES)
             
         if path.endswith(".sha1"):
-            file_hash = self.bucket.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
-            self.open_files[path] = array.array('c',file_hash.encode("utf-8"))
+            self.open_files[path] = B2HashFile(self, path)
         elif self.open_files.get(path) is None:
-            self.open_files[path] = array.array('c',self.bucket.get_file(path))
+            self.open_files[path] = B2File(self, path)
   
         
         self.fd += 1
@@ -403,9 +689,7 @@ class B2Fuse(Operations):
         if path.startswith("/"):
             path = path[1:]
             
-        self.dirty_files.add(path)
-            
-        self.open_files[path] = array.array('c')
+        self.open_files[path] = B2File(self, path, True) #array.array('c')
         
         self.fd += 1
         return self.fd
@@ -415,20 +699,15 @@ class B2Fuse(Operations):
         if path.startswith("/"):
             path = path[1:]
         
-        return self.open_files[path][offset:offset + length].tostring()
+        return self.open_files[path].read(offset, length).tostring()
 
     def write(self, path, data, offset, fh):
         self.logger.debug("Write %s (len:%s offset:%s)", path, len(data), offset)
         if path.startswith("/"):
             path = path[1:]
             
-        self.dirty_files.add(path)
-        
-        if offset == len(self.open_files[path]):
-            self.open_files[path].extend(data)
-        else:
-            r = self.open_files[path][:offset] + array.array('c', data) + self.open_files[path][offset+len(data):]
-            self.open_files[path] = r
+        self.open_files[path].set_dirty(True)
+        self.open_files[path].write(offset, data)
         
         return len(data)
 
@@ -437,25 +716,15 @@ class B2Fuse(Operations):
         if path.startswith("/"):
             path = path[1:]
             
-        self.dirty_files.add(path)
-            
-        self.open_files[path] = self.open_files[path][:length]
+        self.open_files[path].set_dirty(True)
+        self.open_files[path].truncate(length)# = self.open_files[path][:length]
 
     def flush(self, path, fh):
         self.logger.debug("Flush %s %s", path, fh)
         if path.startswith("/"):
             path = path[1:]
-            
-        if path not in self.dirty_files:
-            
-            self.logger.debug("File not dirty, skipping upload")
-            return 
-            
-        filename = path.split("/")[-1]
-        if not filename.endswith(".sha1"):
-            self.bucket.put_file(path, self.open_files[path])
-    
-        self.dirty_files.remove(path)
+        
+        self.open_files[path].upload()
 
     def release(self, path, fh):
         self.logger.debug("Release %s %s", path, fh)
@@ -465,17 +734,15 @@ class B2Fuse(Operations):
         self.logger.debug("Flushing file in case it was dirty")
         self.flush(path,fh)
         
-        self.closed_files.add(path)
-        
-        if self._get_memory_consumption() > self.memory_limit:
-            self.logger.debug("Memory consumption overflow, purging file")
-            biggest_file = None
-            for filename in self.closed_files:
-                if biggest_file is None or len(self.open_files[filename]) > len(self.open_files[biggest_file]):
-                    biggest_file = filename
+        #if self._get_memory_consumption() > self.memory_limit:
+            #self.logger.debug("Memory consumption overflow, purging file")
+            #biggest_file = None
+            #for filename in self.closed_files:
+                #if biggest_file is None or len(self.open_files[filename]) > len(self.open_files[biggest_file]):
+                    #biggest_file = filename
                     
-            self.logger.debug("File %s was chosen for purging, this will free %s MB" % (biggest_file, len(self.open_files[biggest_file])/(1024**2)))
-            self._remove_local_file(biggest_file)
+            #self.logger.debug("File %s was chosen for purging, this will free %s MB" % (biggest_file, len(self.open_files[biggest_file])/(1024**2)))
+            #self._remove_local_file(biggest_file)
 
 
 def create_parser():

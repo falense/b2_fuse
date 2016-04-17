@@ -169,17 +169,25 @@ class B2Bucket(object):
             
         self.logger.info("%s File deleted (%s) ", func_name, filename)
         
-    def _get_file(self, filename):
+    def _get_file(self, filename, byte_range=None):
         func_name = "_get_file"
-        self.logger.info("%s %s", func_name, filename)
+        self.logger.info("%s %s (bytes=%s)", func_name, filename, byte_range)
         
         api_url = self.download_url + '/file/' + self.bucket_name + '/' + b2_url_encode(filename)
         api_call_params = {'Authorization': self.account_token}
+        
+        if byte_range is not None:
+            api_call_params['range'] = "%s-%s" % byte_range
+        
             
         encoded_headers = self._encode_headers(api_call_params)
             
         with OpenUrl(api_url, None, encoded_headers) as resp:
             self.logger.info("%s File downloaded", func_name)
+            try:
+                print 'Content-Range', resp['Content-Range']
+            except:
+                pass
             return resp.read()
             
     #File listint calls
@@ -204,14 +212,14 @@ class B2Bucket(object):
         return map(lambda f: f['fileId'], self._get_file_versions(*args))
         
     #File update calls
-    def put_file(self, *args):
-        return self._put_file(*args)
+    def put_file(self, *args, **kwargs):
+        return self._put_file(*args, **kwargs)
         
-    def delete_file(self, *args):
-        return self._delete_file(*args)
+    def delete_file(self, *args, **kwargs):
+        return self._delete_file(*args, **kwargs)
         
-    def get_file(self, *args):
-        return self._get_file(*args)
+    def get_file(self, *args, **kwargs):
+        return self._get_file(*args, **kwargs)
         
 
 

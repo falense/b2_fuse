@@ -151,5 +151,5 @@ class B2BucketCached(B2Bucket):
             self.cache['_list_dir'].add_file(file_info)
         return file_info
             
-    def get_file(self, *args):
-        return self._get_file(*args)
+    def get_file(self, *args, **kwargs):
+        return self._get_file(*args, **kwargs)
