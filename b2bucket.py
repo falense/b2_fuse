@@ -176,18 +176,16 @@ class B2Bucket(object):
         api_url = self.download_url + '/file/' + self.bucket_name + '/' + b2_url_encode(filename)
         api_call_params = {'Authorization': self.account_token}
         
-        if byte_range is not None:
-            api_call_params['range'] = "%s-%s" % byte_range
         
-            
         encoded_headers = self._encode_headers(api_call_params)
+        
+        if byte_range is not None:
+            encoded_headers['Content-Type'] = "application/octet-stream"
+            encoded_headers['Range'] = "bytes=%s-%s" % byte_range
+            
             
         with OpenUrl(api_url, None, encoded_headers) as resp:
             self.logger.info("%s File downloaded", func_name)
-            try:
-                print 'Content-Range', resp['Content-Range']
-            except:
-                pass
             return resp.read()
             
     #File listint calls

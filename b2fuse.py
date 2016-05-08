@@ -31,6 +31,7 @@ import errno
 import argparse
 import logging
 import array
+import shutil
 
 from fuse import FUSE, FuseOSError, Operations
 from stat import S_IFDIR, S_IFLNK, S_IFREG
@@ -103,8 +104,6 @@ class B2BaseFile(object):
     def delete(self):
         raise NotImplemented()
         
-        
-        
     def upload(self):
         raise NotImplemented()
         
@@ -137,12 +136,12 @@ class B2HashFile(object):
         return
         
     def read(self, offset, length):
-        return
+        return self.data
         
 
-class B2FileMemory(B2BaseFile):
+class B2SequentialFileMemory(B2BaseFile):
     def __init__(self, b2fuse, path, new_file=False):
-        super(B2FileMemory, self).__init__(b2fuse, path)
+        super(B2SequentialFileMemory, self).__init__(b2fuse, path)
         
         self._dirty = False
         if new_file:
@@ -189,140 +188,124 @@ class B2FileMemory(B2BaseFile):
     def delete(self):
         del self.data
     
-class B2FileLargeMemory(B2BaseFile):
+class B2SparseFileMemory(B2BaseFile):
     def __init__(self, b2fuse, path, new_file=False):
-        super(B2FileLargeMemory, self).__init__(b2fuse, path)
+        super(B2SparseFileMemory, self).__init__(b2fuse, path)
+        
+        self.prefect_parts = 1
         
         self._dirty = False
+        
+        self.part_size = int(self.b2fuse.file_download_split)*1024**2
+        self.upload_part_size = 100*1024**2
         if new_file:
             self.data = [array.array('c')]
             self._dirty = True
             
             self.file_parts = [True] 
+            self.size = 0
         else:
-             #array.array('c')#,self.b2fuse.bucket.get_file(path))
-            
-            size = self.b2fuse.bucket.get_file_info(path)['size']
-            num_file_parts = 1 + size/(int(self.b2fuse.file_download_split)*1024**2)
+            self.size = self.b2fuse.bucket.get_file_info(path)['size']
+            num_file_parts = 1 + self.size/self.part_size
+            print "FIle parts", num_file_parts
             self.file_parts = [False] * num_file_parts
             self.data = [None]* num_file_parts
         
         
-    #def __getitem__(self, key):
-        #if isinstance(key, slice):
-            #return self.data[key.start:key.stop] 
-        #return self.data[key]
-        
     def upload(self):
-        
         if self._dirty:
             self.b2fuse.bucket.put_file(self.path, self.read(0, len(self)))
         
         self._dirty = False
         
-    #def __setitem__(self, key, value):
-    #    self.data[key] = value
-        
     def __len__(self):
-        total_length = 0
-        
-        for part in range(len(self.file_parts)):
-            total_length += len(self.file_parts[part])
-            
-        return total_length
-        
-    #def __del__(self):
-    #    self.delete()
+        return self.size
         
     def write(self, offset, data):
         if offset == len(self):
+            part_index = len(self.data)-1
             
-            part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+            length = len(data)
             
-            start_part = int(offset)/part_bytes
-            
-            
-            
-            end_part = int(end_index)/part_bytes
-            
-            
-            
-            self.data.extend(data)
+            if length < self.part_size - len(self.data[part_index]):
+                self.data[part_index].extend(data)
+                
+                self.size += length
+            else:
+                available_bytes = self.part_size - len(self.data[part_index])
+                self.data[part_index].extend(data[:available_bytes])
+                
+                leftover_data = data[available_bytes:]
+                self.data.append(array.array('c', leftover_data))
+                self.file_parts.append(True)
+                
+                self.size += length
         else:
             raise NotImplemented("Random write")
-            #self.open_files[path] = self.open_files[path][:offset] + array.array('c', data) + self.open_files[path][offset+len(data):]
             
     def _data_available(self, start_index, end_index):
-        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
-        
-        start_part = int(start_index)/part_bytes
-        end_part = int(end_index)/part_bytes
+        start_part = int(start_index)/self.part_size 
+        end_part = int(end_index)/self.part_size 
         
         for part in range(start_part, end_part+1, 1):
             if not self.file_parts[part]:
                 return False
                 
         return True
-                
-        
             
-    def _fetch_parts(self, start_index, end_index):
-        print "Fetching parts"
+    def _fetch_parts(self, start_index, end_index):     
+        start_part = int(start_index)/self.part_size
+        end_part = int(end_index)/self.part_size
         
-        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
-        
-        start_part = int(start_index)/part_bytes
-        end_part = int(end_index)/part_bytes
+        if end_part + self.prefect_parts < len(self.data):
+            end_part += self.prefect_parts
         
         for part in range(start_part, end_part+1, 1):
-            print part,
             if not self.file_parts[part]:
-                i_start = part*part_bytes
-                i_end = (part+1)*part_bytes - 1
+                i_start = part*self.part_size
+                i_end = (part+1)*self.part_size - 1
                 
                 temp_data = self.b2fuse.bucket.get_file(self.path, byte_range=(i_start,i_end))
+                
                 self.data[part] = array.array("c", temp_data)
+                self.file_parts[part] = True
         
-        print
     def read(self, offset, length):
+        if offset+length > len(self):
+            length = len(self)-offset
 
         if not self._data_available(offset,offset+length):
             self._fetch_parts(offset, offset+length)
             
+        start_part = int(offset)/self.part_size
+        end_part = int(offset+length)/self.part_size
         
-        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
+        chunk_start_index = offset % self.part_size
         
-        start_part = int(offset)/part_bytes
-        end_part = int(offset+length)/part_bytes
-        
-        
-        
-        chunk_start_index = offset % part_bytes
-        
-        temp_length = min(length, part_bytes)
+        temp_length = min(length, self.part_size)
         temp_data = self.data[start_part][chunk_start_index:chunk_start_index + temp_length]
         chunk = array.array('c', temp_data)
         
-        if length > (part_bytes - chunk_start_index):
+        if length > (self.part_size - chunk_start_index):
             for part in range(start_part+1, end_part, 1):
                 chunk.extend(self.data[part])
                 
-            chunk_end_index = (offset+length) %  part_bytes
+            chunk_end_index = (offset+length) %  self.part_size
             if chunk_end_index != 0:
                 chunk.extend(self.data[end_part][:chunk_end_index])
                 
         return chunk
-            
         
     def truncate(self, length):
-        part_bytes = (int(self.b2fuse.file_download_split)*1024**2)
-        end_part = int(length)/part_bytes
-        
-        self.data = self.data[:end_part]
-        
-        end_offset = length % part_bytes
-        self.data[end_part] = self.data[end_part][:end_offset]
-        
+        if length == 0:            
+            self.data = [array.array('c')]
+            self._dirty = True
+            
+            self.file_parts = [True] 
+            self.size = 0
+        else:
+            raise NotImplemented("Truncate size other than 0")
+            
     def set_dirty(self, new_value):
         self._dirty = new_value
         
@@ -363,9 +346,8 @@ class B2FileDisk(object):
         self.delete()
         
         
-import shutil
 
-B2File = B2FileLargeMemory
+B2File = B2SparseFileMemory
 
 class B2Fuse(Operations):
     def __init__(self, account_id = None, application_key = None, bucket_id = None, enable_hashfiles=False, memory_limit=128):
@@ -608,7 +590,7 @@ class B2Fuse(Operations):
 
     def _remove_local_file(self, path):
         if path in self.open_files.keys():
-            self.open_files[path].remove()
+            self.open_files[path].delete()
             
             del self.open_files[path]
 
@@ -702,7 +684,7 @@ class B2Fuse(Operations):
         return self.open_files[path].read(offset, length).tostring()
 
     def write(self, path, data, offset, fh):
-        self.logger.debug("Write %s (len:%s offset:%s)", path, len(data), offset)
+        #self.logger.debug("Write %s (len:%s offset:%s)", path, len(data), offset)
         if path.startswith("/"):
             path = path[1:]
             
