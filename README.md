@@ -22,6 +22,11 @@ sudo apt-get install python-pip
 sudo pip install fusepy
 ```
 
+On Python 2.7 use this instead:
+```
+sudo python -m pip install fusepy
+```
+
 An example config ("config.yaml"):
 
 ```
