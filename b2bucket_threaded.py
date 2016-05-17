@@ -1,3 +1,28 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+#The MIT License (MIT)
+
+#Copyright (c) 2015 Sondre Engebraaten
+
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+
+#The above copyright notice and this permission notice shall be included in all
+#copies or substantial portions of the Software.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#SOFTWARE.
+
 import logging
 import threading
 
@@ -6,10 +31,10 @@ from Queue import LifoQueue, Empty
 from threading import Lock
 from collections import defaultdict
 
-from b2bucket import *
+from b2bucket import B2Bucket
+from b2bucket_cached import B2BucketCached
   
-#Threaded operations, memory only
-class B2BucketThreaded(B2Bucket): 
+class B2BucketThreaded(B2BucketCached): 
     def __init__(self, *args):
         super(B2BucketThreaded, self).__init__( *args)
         
@@ -129,136 +154,11 @@ class B2BucketThreaded(B2Bucket):
             self.pre_queue.put((filename, "deletion", None),True)
             
     
-    def get_file(self, filename):
-        with self.file_locks[filename]:
-            return super(B2BucketThreaded,self).get_file(filename)
+    def get_file(self, *args, **kwargs):
+        with self.file_locks[args[0]]:
+            return super(B2BucketThreaded,self).get_file(*args, **kwargs)
     
 
-
-#Threaded operations, disk only
-class B2BucketThreadedLocal(B2Bucket): 
-    def __init__(self, *args):
-        super(B2BucketThreaded, self).__init__( *args)
-        
-        num_threads=50
-        self.queue = LifoQueue(num_threads*2)
-        
-        self.file_locks = defaultdict(Lock)
-        
-        self.running = True
-        
-        self.threads = []
-        print "Thread ",
-        for i in xrange(num_threads):
-            t = threading.Thread(target=self._file_updater)
-            t.start()
-            self.threads.append(t)
-            
-            print ".",
-            
-        print 
-        
-        self.pre_queue_lock = Lock()
-        self.pre_queue_running = True
-        self.pre_queue = LifoQueue(num_threads*2)
-        
-        self.pre_file_dict = {}
-        
-        self.pre_thread = threading.Thread(target=self._prepare_update)
-        self.pre_thread.start()
-        
-        
-    
-    def _prepare_update(self):
-        while self.pre_queue_running:
-            try:
-                filename, local_filename, operation  = self.pre_queue.get(True,1)
-                self.pre_file_dict[filename] = (time(), local_filename, operation)
-                self.pre_queue.task_done()
-            except Empty:
-                for filename, (timestamp, local_filename, operation) in self.pre_file_dict.items():
-                    if time()-timestamp > 15:
-                        self.queue.put((filename, local_filename, operation))
-                    
-                        del self.pre_file_dict[filename]
-        
-        for filename, (timestamp, local_filename, operation) in self.pre_file_dict.items():
-            self.queue.put((filename, local_filename, operation))
-            del self.pre_file_dict[filename]
-            
-    def _file_updater(self):
-        while self.running:
-            try:
-                filename, local_filename, operation  = self.queue.get(True,1)
-            except Empty:
-                continue
-            
-            
-            with self.file_locks[filename]:
-                if operation == "deletion":
-                    super(B2BucketThreaded,self)._delete_file(filename)
-                    self.queue.task_done()
-                    
-                elif operation == "upload":
-                    super(B2BucketThreaded,self)._put_file(filename, local_filename)
-                    self.queue.task_done()
-                    
-                elif operation == "download":
-                    super(B2BucketThreaded,self)._get_file(filename, local_filename)
-                    self.queue.task_done()
-                    
-                else:
-                    self.logger.error("Invalid operation %s on %s" % (operation, filename))
-                
-            
-    
-    def __enter__(self):
-        return self
-        
-    def __exit__(self, *args, **kwargs):
-        self.logger.info("Waiting for all B2 requests to complete")
-        
-        self.logger.info("Pre-Queue contains %s elements", self.pre_queue.qsize())
-        self.pre_queue.join()
-        
-        self.logger.info("Joining pre queue thread")
-        self.pre_queue_running = False
-        self.pre_thread.join()
-        
-        self.logger.info("Queue contains %s elements", self.queue.qsize())
-        self.queue.join()
-        
-        self.logger.info("Joining threads")
-        self.running = False
-        for t in self.threads:
-            t.join()
-            
-            
-    def put_file(self, filename, local_filename):
-        with self.pre_queue_lock:
-            self.logger.info("Postponing upload of %s (%s)", filename, len(data))
-            
-            self.pre_queue.put((filename, local_filename, "upload"), True)
-            
-            new_file = {}
-            new_file['fileName'] = filename
-            new_file['fileId'] = None
-            new_file['uploadTimestamp'] = time()
-            new_file['action'] = 'upload'
-            new_file['contentLength'] = len(data)
-                
-            return new_file
-        
-    def delete_file(self, filename):  
-        with self.pre_queue_lock:
-            self.logger.info("Postponing deletion of %s", filename)
-            self.pre_queue.put((filename, None, "deletion"),True)
-            
-    
-    def get_file(self, filename, local_filename):
-        with self.pre_queue_lock:
-            self.logger.info("Postponing download of %s", filename)
-            self.pre_queue.put((filename, local_filename, "download"),True)
 
         
 if __name__=="__main__":
