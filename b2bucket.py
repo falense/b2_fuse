@@ -31,6 +31,7 @@ import urllib
 import urllib2
 import json
 import unittest
+import hashlib
 
 from time import time
 from Queue import LifoQueue, Empty
@@ -103,8 +104,6 @@ class B2Bucket(object):
         
         self.bucket_name = self._get_bucket_name(self.bucket_id)
 
-        
-        
     def _encode_headers(self, headers):
         encoded_headers = dict(
             (k.encode('ascii'), b2_url_encode(v).encode('ascii'))
@@ -120,7 +119,6 @@ class B2Bucket(object):
         api_call_params = { 'accountId' : self.account_id }
         
         self.logger.info(func_name)
-        
         
         return self._call_api(api_call, api_call_params)['buckets']
             
@@ -198,7 +196,7 @@ class B2Bucket(object):
         api_call = '/b2api/v1/b2_list_file_versions'
         api_call_params = {'bucketId' : self.bucket_id, 'startFileName': filename}
 
-        resp = call_api(self.api_url, api_call, self.account_token, api_call_params)
+        resp = self._call_api(api_call, api_call_params)
         filtered_files = filter(lambda f: f['fileName'] == filename, resp['files'])
         
         return  filtered_files 
@@ -248,7 +246,7 @@ class B2Bucket(object):
         
         for file_id in file_ids:
             api_call_params['fileId'] = file_id
-            resp = self._call_api(self.api_url, api_call, self.account_token, api_call_params)
+            resp = self._call_api(api_call, api_call_params)
             
         self.logger.info("%s File deleted (%s) ", func_name, filename)
         
@@ -349,7 +347,7 @@ class B2Bucket(object):
         return self._delete_file(*args, **kwargs)
         
     def get_file(self, *args, **kwargs):
-        return self._get_file(args[0], kwargs["byte_range"])
+        return self._get_file(args[0], kwargs.get("byte_range"))
 
     #Enabling bucket and teardown
     def __enter__(self):

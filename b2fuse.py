@@ -84,9 +84,6 @@ class DirectoryStructure(object):
                 return r.keys()
             else:
                 return None
-                
-
-        
 
 B2File = B2SparseFileMemory
 
@@ -136,11 +133,15 @@ class B2Fuse(Operations):
     # ==================
     
     def _exists(self, path, include_hash=True):
+        #Handle hash files
         if include_hash and path.endswith(".sha1"):
             path = path[:-5]
         
+        #File is in bucket
         if path in self.bucket.list_dir():
             return True
+        
+        #File is open (but possibly not in bucket)
         if path in self.open_files.keys():
             return True
         
@@ -155,12 +156,13 @@ class B2Fuse(Operations):
         
     def access(self, path, mode):
         self.logger.debug("Access %s (mode:%s)", path, mode)
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
             
+        #Return access granted if path is a directory
         if self.directories.is_directory(path):
             return
             
+        #Return access granted if path is a file
         if self._exists(path):
             return 
             
@@ -175,12 +177,12 @@ class B2Fuse(Operations):
     def getattr(self, path, fh=None):
         self.logger.debug("Get attr %s", path)
         self.logger.debug("Memory used %s", round(self._get_memory_consumption(),2))
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
         
         #Check if path is a directory
         if self.directories.is_directory(path):
             return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(), st_mtime=time(), st_atime=time(), st_nlink=2)
+            
         #Check if path is a file
         elif self._exists(path):
             #If file exist return attributes
@@ -188,9 +190,11 @@ class B2Fuse(Operations):
                 #print "File is in bucket"
                 file_info = self.bucket.get_file_info(path)
                 return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
+                
             elif path.endswith(".sha1"):
                 #print "File is just a hash"
                 return dict(st_mode=(S_IFREG | 0444), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=42)
+                
             else:
                 #print "File exists only locally"
                 return dict(st_mode=(S_IFREG | 0777), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=len(self.open_files[path]))
@@ -199,8 +203,7 @@ class B2Fuse(Operations):
         
     def readdir(self, path, fh):
         self.logger.debug("Readdir %s", path)
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
 
         #Update the local filestructure
         self.directories.update_structure(self.bucket.list_dir(path) + self.open_files.keys(), self.local_directories)
@@ -231,9 +234,11 @@ class B2Fuse(Operations):
             #File already listed
             if filename in dirents:
                 continue
+                
             #File is not in current folder
             if not in_folder(filename):
                 continue
+                
             #File is a virtual hashfile
             if filename.endswith(".sha1"):
                 continue
@@ -255,44 +260,33 @@ class B2Fuse(Operations):
         
         return dirents
 
-    #def readlink(self, path):
-        #self.logger.debug("Readlink %s", path)
-
-    #def mknod(self, path, mode, dev):
-        #self.logger.debug("Mknod %s (mode:%s dev:%s)", path, mode, dev)
-
     def rmdir(self, path):
         self.logger.debug("Rmdir %s", path)
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
             
         def in_folder(filename):
             if filename.startswith(path):
-                relative_filename = filename[len(path):]
-                
-                if relative_filename.startswith("/"):
-                    relative_filename = relative_filename[1:]
+                relative_filename = self._remove_start_slash(filename[len(path):])
                 
                 if "/" not in relative_filename:
                     return True
             
             return False
             
-        dirents = []
         #Add files found in bucket
         bucket_files = self.bucket.list_dir()
-        for filename in bucket_files:
-            if in_folder(filename):
-                dirents.append(filename)
+        dirents = filter(in_folder, bucket_files)
         
         #Add files kept in local memory
         for filename in self.open_files.keys():
             #File already listed
             if filename in dirents:
                 continue
+                
             #File is not in current folder
             if not in_folder(filename):
                 continue
+                
             #File is a virtual hashfile
             if filename.endswith(".sha1"):
                 continue
@@ -314,20 +308,17 @@ class B2Fuse(Operations):
         
     def mkdir(self, path, mode):
         self.logger.debug("Mkdir %s (mode:%s)", path, mode)
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
         
         self.local_directories.append(path)
         
         #Update the local filestructure
         self.directories.update_structure(self.bucket.list_dir() + self.open_files.keys(), self.local_directories)
         
-
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
         return dict(f_bsize=4096*16, f_blocks=1024**4, f_bfree=1024**4, f_bavail=1024**4)
-
 
     def _remove_local_file(self, path):
         if path in self.open_files.keys():
@@ -335,12 +326,9 @@ class B2Fuse(Operations):
             
             del self.open_files[path]
 
-            
-
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
             
         if not self._exists(path, include_hash=False):
             return
@@ -355,18 +343,14 @@ class B2Fuse(Operations):
     def rename(self, old, new):
         self.logger.debug("Rename old: %s, new %s", old, new)
         
-        if old.startswith("/"):
-            old = old[1:]
-            
-        if new.startswith("/"):
-            new = new[1:]
+        old = self._remove_start_slash(old)
+        new = self._remove_start_slash(new)
         
         if not self._exists(old):
             raise FuseOSError(errno.ENOENT)
             
         if self._exists(new):
             self.unlink(new)
-            #raise FuseOSError(errno.EEXIST)
             
         if old in self.dirty_files:
             self.dirty_files.remove(old)
@@ -392,26 +376,24 @@ class B2Fuse(Operations):
 
     def open(self, path, flags):
         self.logger.debug("Open %s (flags:%s)", path, flags)
-        if path.startswith("/"):
-            path = path[1:]
+        path = self._remove_start_slash(path)
             
         if not self._exists(path):
             raise FuseOSError(errno.EACCES)
             
         if path.endswith(".sha1"):
             self.open_files[path] = B2HashFile(self, path)
+            
         elif self.open_files.get(path) is None:
             self.open_files[path] = B2File(self, path)
   
-        
         self.fd += 1
         return self.fd
 
     def create(self, path, mode, fi=None):
         self.logger.debug("Create %s (mode:%s)", path, mode)
-        if path.startswith("/"):
-            path = path[1:]
             
+        path = self._remove_start_slash(path)
         self.open_files[path] = B2File(self, path, True) #array.array('c')
         
         self.fd += 1
@@ -419,16 +401,12 @@ class B2Fuse(Operations):
 
     def read(self, path, length, offset, fh):
         self.logger.debug("Read %s (len:%s offset:%s fh:%s)", path, length, offset, fh)
-        if path.startswith("/"):
-            path = path[1:]
         
-        return self.open_files[path].read(offset, length).tostring()
+        return self.open_files[self._remove_start_slash(path)].read(offset, length).tostring()
 
     def write(self, path, data, offset, fh):
-        #self.logger.debug("Write %s (len:%s offset:%s)", path, len(data), offset)
-        if path.startswith("/"):
-            path = path[1:]
-            
+        path = self._remove_start_slash(path)
+        
         self.open_files[path].set_dirty(True)
         self.open_files[path].write(offset, data)
         
@@ -436,37 +414,27 @@ class B2Fuse(Operations):
 
     def truncate(self, path, length, fh=None):
         self.logger.debug("Truncate %s (%s)", path, length)
-        if path.startswith("/"):
-            path = path[1:]
             
+        path = self._remove_start_slash(path)
         self.open_files[path].set_dirty(True)
         self.open_files[path].truncate(length)# = self.open_files[path][:length]
 
     def flush(self, path, fh):
         self.logger.debug("Flush %s %s", path, fh)
-        if path.startswith("/"):
-            path = path[1:]
         
-        self.open_files[path].upload()
+        self.open_files[self._remove_start_slash(path)].upload()
 
     def release(self, path, fh):
         self.logger.debug("Release %s %s", path, fh)
-        if path.startswith("/"):
-            path = path[1:]
             
         self.logger.debug("Flushing file in case it was dirty")
-        self.flush(path,fh)
-        
-        #if self._get_memory_consumption() > self.memory_limit:
-            #self.logger.debug("Memory consumption overflow, purging file")
-            #biggest_file = None
-            #for filename in self.closed_files:
-                #if biggest_file is None or len(self.open_files[filename]) > len(self.open_files[biggest_file]):
-                    #biggest_file = filename
-                    
-            #self.logger.debug("File %s was chosen for purging, this will free %s MB" % (biggest_file, len(self.open_files[biggest_file])/(1024**2)))
-            #self._remove_local_file(biggest_file)
+        self.flush(self._remove_start_slash(path),fh)
 
+    def _remove_start_slash(self, path):
+        if path.startswith("/"):
+            path = path[1:]
+        return path
+        
 
 def create_parser():
     parser = argparse.ArgumentParser()
