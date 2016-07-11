@@ -32,6 +32,7 @@ import urllib2
 import json
 import unittest
 import hashlib
+import ssl
 
 from time import time
 from Queue import LifoQueue, Empty
@@ -299,25 +300,50 @@ class B2Bucket(object):
         for attempt in range(num_attempts):
             try:
                 request = urllib2.Request(url, data, headers)
-                handle = urllib2.urlopen(request, timeout=2.)
+                handle = urllib2.urlopen(request, timeout=30.)
                 return handle
             
             #Error message from server
             except urllib2.HTTPError as e:
+                print e
+                
                 error_text = e.read()
                 error = json.loads(error_text)
             
-                raise HttpError(url, data, headers, error["message"], error["code"], error["status"])
+                error_code = int(error["status"]) 
+                
+                if error_code / 100 == 5: 
+                    self.logger.warn("Server error. Request failed, attempt %s/%s", attempt+1, num_attempts)
+                
+                else:
+                    raise HttpError(url, data, headers, error["message"], error["code"], error["status"])
                 
             #Error message from local network
             except urllib2.URLError as e:
+                print e
                 #API request timed out
                 if str(e.reason) == "timed out":
-                    self.logger.warn("Request failed, attempt %s/%s", attempt+1, num_attempts)
-                    continue
+                    self.logger.warn("Network timeout. Request failed, attempt %s/%s", attempt+1, num_attempts)
+                else:
+                    raise e
+                    
+                    
+            #Error message from local network
+            except ssl.SSLError as e:
+                print e
+                #Check if API request timed out
+                if str(e.message) == "The read operation timed out":
+                    self.logger.warn("SSL error. Request failed, attempt %s/%s", attempt+1, num_attempts)
+                    
+                else:
+                    raise e
+            
+            sleep(1.0)
+            
             
         #Something else happened, re-raise exception
         self.logger.warn("Retry attempts exhausted")
+        raise RuntimeError("API not responding")
             
     #File listint calls
     def list_dir(self, path=""):

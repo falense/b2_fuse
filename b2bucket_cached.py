@@ -31,7 +31,7 @@ from Queue import LifoQueue, Empty
 from threading import Lock
 from collections import defaultdict
 
-from b2bucket import B2Bucket
+from b2bucket import B2Bucket, UploadFailed
 
 #General cache used for B2Bucket
 class Cache(object):

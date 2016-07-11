@@ -25,14 +25,14 @@
 
 import logging
 import threading
+import unittest
 
-from time import time
+from time import time, sleep
 from Queue import LifoQueue, Empty
 from threading import Lock
 from collections import defaultdict
 
-from b2bucket import B2Bucket
-from b2bucket_cached import B2BucketCached
+from b2bucket_cached import B2BucketCached, UploadFailed
   
 class B2BucketThreaded(B2BucketCached): 
     def __init__(self, *args):
@@ -94,6 +94,7 @@ class B2BucketThreaded(B2BucketCached):
             
             
             with self.file_locks[filename]:
+                print "locking", filename
                 if operation == "deletion":
                     super(B2BucketThreaded,self)._delete_file(filename)
                     self.queue.task_done()
@@ -108,7 +109,7 @@ class B2BucketThreaded(B2BucketCached):
                 else:
                     self.logger.error("Invalid operation %s on %s" % (operation, filename))
                 
-            
+                print "unlocking", filename
     
     def __enter__(self):
         return self
@@ -135,6 +136,7 @@ class B2BucketThreaded(B2BucketCached):
             
     def put_file(self, filename, data):
         with self.pre_queue_lock:
+            print filename
             self.logger.info("Postponing upload of %s (%s)", filename, len(data))
             
             self.pre_queue.put((filename, "upload", data), True)
@@ -158,27 +160,83 @@ class B2BucketThreaded(B2BucketCached):
         with self.file_locks[args[0]]:
             return super(B2BucketThreaded,self).get_file(*args, **kwargs)
     
+    def idle(self):
+        
+        self.pre_queue.join()
+        print "pre_queue is empty"
+        
+        self.queue.join()
+        print "queue is empty"
+        
+        for lock in self.file_locks.values():
+            lock.acquire()
+        print "acquired all locks"
+            
+        for lock in self.file_locks.values():
+            lock.release()
+            
 
-
+class TestBucketInterface(unittest.TestCase):
+    def setUp(self):
+        from utility import load_config
+        config = load_config()
+        
+        account_id = config['accountId']
+        application_key = config['applicationKey']
+        bucket_id = config['bucketId']
+        
+        self.bucket = B2BucketThreaded(account_id, application_key, bucket_id)
+    
+    def tearDown(self):
+        self.bucket.__exit__()
+        
+    def test_multi_upload(self):
+        import random
+        
+        start = time()
+        
+        file_list = []
+        
+        print "Uploading files"
+        
+        for i in xrange(10):
+            filename = "junk-%s.txt" % random.randint(0,100000000)
+            self.bucket.put_file(filename,"ascii")
+            
+            file_list.append(filename)
+            
+        print "Finished pushing uploads"
+        
+        self.bucket.idle()
+        
+        def in_file_list(filename):
+            return unicode(filename) in file_list
+        
+        file_list_from_bucket = self.bucket.list_dir()
+        
+        
+        
+        successfully_uploaded = filter(in_file_list, file_list_from_bucket)
+        
+        print file_list_from_bucket, successfully_uploaded
+        
+        self.assertEqual(len(successfully_uploaded), len(file_list), "Not all files were uploaded")
+                
+    #def test_multi_download(self):
+        #file_list = self.bucket._list_dir()
+        
+        #print "List of files:"
+        #for file_info in file_list:
+            #for key, value in file_info.items():
+                #print "\t %s: %s" % (key,value)
+            #print 
+            
+            
+        end = time()
+        
+        print "Uploads took %s seconds" % (end-start)
         
 if __name__=="__main__":
-    from b2_fuse import load_config
-    import random 
-            
-    config = load_config()
-        
-    account_id = config['accountId']
-    application_key = config['applicationKey']
-    bucket_id = config['bucketId']
-   
-    with B2BucketThreaded(account_id, application_key, bucket_id) as bucket:
-        start = time()
-        for i in xrange(50):
-            filename = "junk-%s.txt" % random.randint(0,100000000)
-            bucket.put_file(filename,"ascii")
-        
-    end = time()
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
     
-    print "Uploads took %s seconds" % (end-start)
-    
-    print "Files in bucket %s" % len(bucket.list_dir())
+    unittest.main(failfast=True)
