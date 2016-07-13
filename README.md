@@ -1,6 +1,6 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.2.1
+### Version: 1.3
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 #### Please report bugs, use-case issues and feature requests through the Github issue tracker
@@ -51,20 +51,6 @@ Usage notes:
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 * Having many files in a bucket (multiples of 1000) will drastically increase the startup time/mount time. 
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
-
-### With local copy
-
-If you wish to try the local copy variant, this requires a folder to store the local replica in addition to the mountpoint you wish to use. 
-
-```
-python b2local.py <local_directory> <mountpoint>
-```
-
-Usage notes:
-
-* Threaded uploads and deletions, large files will cause problems as splitting uploads is not yet supported
-* Changes will only take effect online after 15+ seconds. This is a timeout in order to handle multiple successive closures and flushing of the same file. 
-* First synchronization will take a long time. Threading speeds up the process, but FUSE driver will not respond to filesystem requests before synchronization is complete.
 
 ### Application specific notes:
 
