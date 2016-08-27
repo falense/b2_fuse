@@ -373,7 +373,7 @@ class B2Bucket(object):
         return self._delete_file(*args, **kwargs)
         
     def get_file(self, *args, **kwargs):
-        return self._get_file(args[0], kwargs.get("byte_range"))
+        return self._get_file(*args, **kwargs)
 
     #Enabling bucket and teardown
     def __enter__(self):

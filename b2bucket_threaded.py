@@ -88,19 +88,25 @@ class B2BucketThreaded(B2BucketCached):
         upload_url = self._get_upload_url()
         while self.running:
             try:
-                filename, operation, data  = self.queue.get(True,1)
+                filename, operation, optionals   = self.queue.get(True,1)
             except Empty:
                 continue
             
             
             with self.file_locks[filename]:
-                print "locking", filename
-                if operation == "deletion":
+                if operation == "get":
+                    byte_range, callback = optionals
+                    data = super(B2BucketThreaded,self).get_file(filename, byte_range)
+                    if callback:
+                        callback(byte_range, data)
+                    
+                elif operation == "deletion":
                     super(B2BucketThreaded,self)._delete_file(filename)
                     self.queue.task_done()
                     
-                elif operation == "upload":
+                elif operation == "put":
                     try:
+                        data = optionals
                         super(B2BucketThreaded,self)._put_file(filename, data, upload_url, False)
                     except UploadFailed:
                         self.logger.error("Failed to upload %s" % filename)
@@ -139,7 +145,7 @@ class B2BucketThreaded(B2BucketCached):
             print filename
             self.logger.info("Postponing upload of %s (%s)", filename, len(data))
             
-            self.pre_queue.put((filename, "upload", data), True)
+            self.pre_queue.put((filename, "put", data), True)
             
             new_file = {}
             new_file['fileName'] = filename
@@ -156,12 +162,17 @@ class B2BucketThreaded(B2BucketCached):
             self.pre_queue.put((filename, "deletion", None),True)
             
     
-    def get_file(self, *args, **kwargs):
-        with self.file_locks[args[0]]:
-            return super(B2BucketThreaded,self).get_file(*args, **kwargs)
+    def get_file(self, filename, byte_range=None, callback=None):
+        with self.file_locks[filename]:
+            return super(B2BucketThreaded,self).get_file(filename, byte_range)
+            
+    def get_file_callback(self, filename, callback, byte_range = None):
+        with self.file_locks[filename]:
+            self.logger.info("Postponing fetching of %s", filename)
+            self.queue.put((filename, "get", (byte_range, callback)),True)
+            return None
     
     def idle(self):
-        
         self.pre_queue.join()
         print "pre_queue is empty"
         
