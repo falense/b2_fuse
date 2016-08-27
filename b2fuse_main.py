@@ -36,11 +36,12 @@ from fuse import FUSE, FuseOSError, Operations
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from time import time
 
-from b2bucket import B2Bucket
-from b2bucket_cached import B2BucketCached
-from b2bucket_threaded import B2BucketThreaded
+from buckettypes.b2bucket import B2Bucket
+from buckettypes.b2bucket_cached import B2BucketCached
+from buckettypes.b2bucket_threaded import B2BucketThreaded
 
-from b2fuse_filetypes import *
+from filetypes.B2SparseFileMemory import B2SparseFileMemory
+from filetypes.B2HashFile import B2HashFile
 
 class DirectoryStructure(object):
     def __init__(self):
