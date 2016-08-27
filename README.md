@@ -35,9 +35,7 @@ applicationKey: <yourapplicationid>
 bucketId: <yourbucketid>
 ```
 
-### Online only copy
-
-This FUSE driver can be used either with a (small) memory backing for current open files or a complete local copy. In order to use the FUSE driver as an interface to the online service B2 (with no local copy) use:
+In order to use the FUSE driver as an interface to the online service B2 run:
 
 ```
 python b2fuse.py <mountpoint>
