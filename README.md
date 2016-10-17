@@ -1,6 +1,6 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.3
+### Version: 1.3 - Beta
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 #### Please report bugs, use-case issues and feature requests through the Github issue tracker
@@ -20,6 +20,12 @@ Install FUSE for python as follows:
 ```
 sudo apt-get install python-pip
 sudo pip install fusepy
+```
+
+Install B2 Comming Line Tool for python as follows: 
+
+```
+sudo pip install b2
 ```
 
 On Python 2.7 use this instead:
