@@ -37,10 +37,12 @@ from stat import S_IFDIR, S_IFLNK, S_IFREG
 from time import time
 
 from buckettypes.b2bucket import B2Bucket
+from buckettypes.b2bucket_wrapper import B2BucketWrapper
 from buckettypes.b2bucket_cached import B2BucketCached
 from buckettypes.b2bucket_threaded import B2BucketThreaded
 
 from filetypes.B2SparseFileMemory import B2SparseFileMemory
+from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
 from filetypes.B2HashFile import B2HashFile
 
 class DirectoryStructure(object):
@@ -83,13 +85,24 @@ class DirectoryStructure(object):
             else:
                 return None
 
-B2File = B2SparseFileMemory
+from b2.account_info.in_memory import InMemoryAccountInfo
+from b2.api import B2Api
+B2File = B2SequentialFileMemory
 
 class B2Fuse(Operations):
     def __init__(self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder ):
+        
+
+
+        account_info = InMemoryAccountInfo()
+        self.api = B2Api(account_info)
+        self.api.authorize_account('production', account_id, application_key)
+        self.bucket_api = self.api.get_bucket_by_id(bucket_id)
+        
+        
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
-        self.bucket = B2BucketThreaded(account_id, application_key, bucket_id)  
+        self.bucket = B2BucketWrapper(account_id, application_key, bucket_id)  
             
         self.enable_hashfiles = enable_hashfiles
         self.memory_limit = memory_limit
@@ -121,7 +134,9 @@ class B2Fuse(Operations):
             path = path[:-5]
         
         #File is in bucket
-        if path in self.bucket.list_dir():
+        
+        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+        if path in online_files:
             return True
         
         #File is open (but possibly not in bucket)
@@ -169,7 +184,9 @@ class B2Fuse(Operations):
         #Check if path is a file
         elif self._exists(path):
             #If file exist return attributes
-            if path in self.bucket.list_dir():
+            
+            online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+            if path in online_files:
                 #print "File is in bucket"
                 file_info = self.bucket.get_file_info(path)
                 return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
@@ -189,7 +206,9 @@ class B2Fuse(Operations):
         path = self._remove_start_slash(path)
 
         #Update the local filestructure
-        self.directories.update_structure(self.bucket.list_dir(path) + self.open_files.keys(), self.local_directories)
+        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+        
+        self.directories.update_structure(online_files + self.open_files.keys(), self.local_directories)
          
         dirents = []
         
@@ -207,8 +226,9 @@ class B2Fuse(Operations):
             
             
         #Add files found in bucket
-        bucket_files = self.bucket.list_dir()
-        for filename in bucket_files:
+        
+        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+        for filename in online_files:
             if in_folder(filename):
                 dirents.append(filename)
         
@@ -257,8 +277,8 @@ class B2Fuse(Operations):
             return False
             
         #Add files found in bucket
-        bucket_files = self.bucket.list_dir()
-        dirents = filter(in_folder, bucket_files)
+        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+        dirents = filter(in_folder, online_files)
         
         #Add files kept in local memory
         for filename in self.open_files.keys():
@@ -277,12 +297,11 @@ class B2Fuse(Operations):
             dirents.append(filename)
             
         for filename in dirents:
-            self.bucket.delete_file(filename)
-            if filename in self.open_files.key():
-                del self.open_files[path]
-        
-            if filename in self.dirty_files:
-                self.dirty_files.remove(filename)
+            online_files = [(f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']]
+            fileName_to_fileId = dict(online_files)
+            self.api.delete_file_version(fileName_to_fileId[path], path)
+            
+            self._remove_local_file(filename)
                 
         if self.directories.is_directory(path):
             if path in self.local_directories:
@@ -296,7 +315,9 @@ class B2Fuse(Operations):
         self.local_directories.append(path)
         
         #Update the local filestructure
-        self.directories.update_structure(self.bucket.list_dir() + self.open_files.keys(), self.local_directories)
+        
+        online_files = [(f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']]
+        self.directories.update_structure(online_files + self.open_files.keys(), self.local_directories)
         
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
@@ -308,6 +329,7 @@ class B2Fuse(Operations):
             self.open_files[path].delete()
             
             del self.open_files[path]
+            
 
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
@@ -316,7 +338,11 @@ class B2Fuse(Operations):
         if not self._exists(path, include_hash=False):
             return
             
-        self.bucket.delete_file(path)
+            
+        online_files = [(f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']]
+        fileName_to_fileId = dict(online_files)
+        self.api.delete_file_version(fileName_to_fileId[path], path)
+        
         
         self._remove_local_file(path)
 
@@ -333,8 +359,6 @@ class B2Fuse(Operations):
         if self._exists(new):
             self.unlink(new)
             
-        if old in self.dirty_files:
-            self.dirty_files.remove(old)
             
         self.open(old,0)
         data = self.open_files[old]
