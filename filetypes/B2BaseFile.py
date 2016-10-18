@@ -27,10 +27,10 @@ import array
 
 import logging
 class B2BaseFile(object):
-    def __init__(self, b2fuse, path):
+    def __init__(self, b2fuse, file_info):
         self.b2fuse = b2fuse
         
-        self.path = path
+        self.file_info = file_info
         
     def __getitem__(self, key):
         raise NotImplemented()

@@ -37,9 +37,7 @@ from stat import S_IFDIR, S_IFLNK, S_IFREG
 from time import time
 
 from buckettypes.b2bucket import B2Bucket
-from buckettypes.b2bucket_wrapper import B2BucketWrapper
 from buckettypes.b2bucket_cached import B2BucketCached
-from buckettypes.b2bucket_threaded import B2BucketThreaded
 
 from filetypes.B2SparseFileMemory import B2SparseFileMemory
 from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
@@ -84,21 +82,79 @@ class DirectoryStructure(object):
                 return r.keys()
             else:
                 return None
+                
+    def get_file_info(self, path):
+        return
 
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
+from b2.bucket import Bucket
+
 B2File = B2SequentialFileMemory
 
-class B2Fuse(Operations):
-    def __init__(self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder ):
+#General cache used for B2Bucket
+class Cache(object):
+    def __init__(self, cache_timeout):
+        self.data = {}
         
+        self.cache_timeout = cache_timeout
+        
+    def update(self, result, params = ""):
+        self.data[params] = (time(), result)
+        
+    def get(self, params = ""):
+        if self.data.get(params) is not None:
+            entry_time, result = self.data.get(params)
+            if time() - entry_time < self.cache_timeout:
+                return result
+            else:
+                del self.data[params]
+        
+        return
 
+class CacheNotFound(BaseException):
+    pass
 
+class CachedBucket(Bucket):
+    def __init__(self, api, bucket_id):
+        super(CachedBucket, self).__init__(api, bucket_id)
+        
+        self._cache = {}
+        
+        self._cache_timeout = 120
+        
+    def _reset_cache(self):
+        self._cache = {}
+        
+    def _update_cache(self, cache_name, result, params=""):
+        self._cache[cache_name].update(result, params)
+        return result
+        
+    def _get_cache(self, cache_name, params="", cache_type=Cache):
+        if self._cache.get(cache_name) is None:
+            self._cache[cache_name] = cache_type(self._cache_timeout)
+            
+        if self._cache[cache_name].get(params) is not None:
+            return self._cache[cache_name].get(params)
+            
+        raise CacheNotFound()
+    
+    def list_file_names(self):
+        func_name = "list_file_names"
+        
+        try:
+            return self._get_cache(func_name)
+        except CacheNotFound:
+            result = super(CachedBucket, self).list_file_names() 
+            return self._update_cache(func_name, result)
+
+    
+class B2Fuse(Operations):
+    def __init__(self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder, use_disk ):
         account_info = InMemoryAccountInfo()
         self.api = B2Api(account_info)
         self.api.authorize_account('production', account_id, application_key)
-        self.bucket_api = self.api.get_bucket_by_id(bucket_id)
-        
+        self.bucket_api = CachedBucket(self.api, bucket_id)
         
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
@@ -107,10 +163,12 @@ class B2Fuse(Operations):
         self.enable_hashfiles = enable_hashfiles
         self.memory_limit = memory_limit
         self.temp_folder = temp_folder
+        self.use_disk = use_disk
         
-        if os.path.exists(self.temp_folder):
-            shutil.rmtree(self.temp_folder)
-        os.makedirs(self.temp_folder)
+        if self.use_disk:
+            if os.path.exists(self.temp_folder):
+                shutil.rmtree(self.temp_folder)
+            os.makedirs(self.temp_folder)
             
         self.directories = DirectoryStructure()
         self.local_directories = []

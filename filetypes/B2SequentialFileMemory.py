@@ -30,16 +30,16 @@ import logging
 from B2BaseFile import B2BaseFile
 
 class B2SequentialFileMemory(B2BaseFile):
-    def __init__(self, b2fuse, path, new_file=False):
-        super(B2SequentialFileMemory, self).__init__(b2fuse, path)
+    def __init__(self, b2fuse, file_info, new_file=False):
+        super(B2SequentialFileMemory, self).__init__(b2fuse, file_info)
         
         self._dirty = False
         if new_file:
             self.data = array.array('c')
             self._dirty = True
         else:
-            self.data = array.array('c',self.b2fuse.bucket.get_file(path))
-        
+            self.data = array.array('c',self.bucket_api.download_file_by_id(self.file_info['fileId']))
+            
     #def __getitem__(self, key):
         #if isinstance(key, slice):
             #return self.data[key.start:key.stop] 
@@ -47,7 +47,7 @@ class B2SequentialFileMemory(B2BaseFile):
         
     def upload(self):
         if self._dirty:
-            self.b2fuse.bucket.put_file(self.path, self.data)
+            self.b2fuse.bucket.put_file(self.file_info['fileName'], self.data)
         
         self._dirty = False
         
@@ -65,7 +65,7 @@ class B2SequentialFileMemory(B2BaseFile):
         if offset == len(self):
             self.data.extend(data)
         else:
-            self.open_files[path] = self.open_files[path][:offset] + array.array('c', data) + self.open_files[path][offset+len(data):]
+            raise NotImplemented()
             
     def read(self, offset, length):
         return self.data[offset: offset+length]
