@@ -23,8 +23,6 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-import array
-import logging
 
 class B2BaseFile(object):
     def __init__(self, b2fuse, file_info):

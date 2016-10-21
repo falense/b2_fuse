@@ -24,10 +24,9 @@
 #SOFTWARE.
 
 import array
-import logging
 
 from b2.download_dest import DownloadDestBytes
-        
+
 from B2BaseFile import B2BaseFile
 
 

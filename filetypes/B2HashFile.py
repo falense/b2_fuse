@@ -24,8 +24,8 @@
 #SOFTWARE.
 
 import array
-import logging
-        
+
+
 class B2HashFile(object):
     def __init__(self, b2fuse, path):
         self.b2fuse = b2fuse

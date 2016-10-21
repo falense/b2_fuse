@@ -24,21 +24,18 @@
 #SOFTWARE.
 
 import os
-import sys
 import errno
 import logging
-import array
 import shutil
 
 from collections import defaultdict
-from fuse import FUSE, FuseOSError, Operations
-from stat import S_IFDIR, S_IFLNK, S_IFREG
+from fuse import FuseOSError, Operations
+from stat import S_IFDIR, S_IFREG
 from time import time
 
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
 
-from filetypes.B2SparseFileMemory import B2SparseFileMemory
 from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
 from filetypes.B2HashFile import B2HashFile
 from directory_structure import DirectoryStructure
