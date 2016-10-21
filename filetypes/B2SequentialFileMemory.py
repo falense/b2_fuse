@@ -43,17 +43,16 @@ class B2SequentialFileMemory(B2BaseFile):
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
             self.data = array.array('c', download_dest.bytes_io.getvalue())
 
-    #def __getitem__(self, key):
-        #if isinstance(key, slice):
-            #return self.data[key.start:key.stop] 
-        #return self.data[key]
+    # def __getitem__(self, key):
+    #    if isinstance(key, slice):
+    #        return self.data[key.start:key.stop] 
+    #    return self.data[key]
 
     def upload(self):
         if self._dirty:
             self.b2fuse.bucket_api.upload_bytes(bytes(self.data), self.file_info['fileName'])
             self.b2fuse._update_directory_structure()
             self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
-
 
         self._dirty = False
 
@@ -66,7 +65,6 @@ class B2SequentialFileMemory(B2BaseFile):
     #def __del__(self):
     #    self.delete()
 
-
     def write(self, offset, data):
         if offset == len(self):
             self.data.extend(data)
@@ -74,7 +72,7 @@ class B2SequentialFileMemory(B2BaseFile):
             raise NotImplemented()
 
     def read(self, offset, length):
-        return self.data[offset: offset+length]
+        return self.data[offset:offset + length]
 
     def truncate(self, length):
         self.data = self.data[:length]
@@ -84,5 +82,7 @@ class B2SequentialFileMemory(B2BaseFile):
 
     def delete(self, delete_online):
         if delete_online:
-            self.b2fuse.bucket_api.delete_file_version(self.file_info['fileId'], self.file_info['fileName'])
+            self.b2fuse.bucket_api.delete_file_version(
+                self.file_info['fileId'], self.file_info['fileName']
+            )
         del self.data

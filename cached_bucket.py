@@ -27,6 +27,7 @@ from time import time
 
 from b2.bucket import Bucket
 
+
 #General cache used for B2Bucket
 class Cache(object):
     def __init__(self, cache_timeout):
@@ -34,10 +35,10 @@ class Cache(object):
 
         self.cache_timeout = cache_timeout
 
-    def update(self, result, params = ""):
+    def update(self, result, params=""):
         self.data[params] = (time(), result)
 
-    def get(self, params = ""):
+    def get(self, params=""):
         if self.data.get(params) is not None:
             entry_time, result = self.data.get(params)
             if time() - entry_time < self.cache_timeout:
@@ -47,8 +48,10 @@ class Cache(object):
 
         return
 
+
 class CacheNotFound(BaseException):
     pass
+
 
 class CachedBucket(Bucket):
     def __init__(self, api, bucket_id):
@@ -80,7 +83,7 @@ class CachedBucket(Bucket):
         try:
             return self._get_cache(func_name)
         except CacheNotFound:
-            result = super(CachedBucket, self).list_file_names() 
+            result = super(CachedBucket, self).list_file_names()
             return self._update_cache(func_name, result)
 
     def delete_file_version(self, *args, **kwargs):
@@ -90,6 +93,3 @@ class CachedBucket(Bucket):
     def download_file_by_id(self, *args, **kwargs):
         self._reset_cache()
         return super(CachedBucket, self).download_file_by_id(*args, **kwargs)
-
-
-

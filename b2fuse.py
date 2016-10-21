@@ -31,6 +31,7 @@ from fuse import FUSE
 
 from b2fuse_main import B2Fuse
 
+
 def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("mountpoint", type=str, help="Mountpoint for the B2 bucket")
@@ -41,9 +42,24 @@ def create_parser():
     parser.add_argument('--use_disk', dest='use_disk', action='store_true')
     parser.set_defaults(use_disk=False)
 
-    parser.add_argument("--account_id", type=str, default=None, help="Account ID for your B2 account (overrides config)")
-    parser.add_argument("--application_key", type=str, default=None, help="Application key for your account  (overrides config)")
-    parser.add_argument("--bucket_id", type=str, default=None, help="Bucket ID for the bucket to mount (overrides config)")
+    parser.add_argument(
+        "--account_id",
+        type=str,
+        default=None,
+        help="Account ID for your B2 account (overrides config)"
+    )
+    parser.add_argument(
+        "--application_key",
+        type=str,
+        default=None,
+        help="Application key for your account  (overrides config)"
+    )
+    parser.add_argument(
+        "--bucket_id",
+        type=str,
+        default=None,
+        help="Bucket ID for the bucket to mount (overrides config)"
+    )
 
     parser.add_argument("--memory_limit", type=int, default=128, help="Memory limit")
     parser.add_argument("--temp_folder", type=str, default=".tmp/", help="Temporary file folder")
@@ -55,6 +71,7 @@ def create_parser():
 def load_config(config_filename):
     with open(config_filename) as f:
         return yaml.load(f.read())
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s:%(levelname)s:%(message)s")
@@ -81,7 +98,6 @@ if __name__ == '__main__':
     else:
         config["enableHashfiles"] = False
 
-
     if args.memory_limit:
         config["memoryLimit"] = args.memory_limit
 
@@ -93,5 +109,8 @@ if __name__ == '__main__':
     else:
         config["useDisk"] = False
 
-    with B2Fuse(config["accountId"], config["applicationKey"], config["bucketId"], config["enableHashfiles"], config["memoryLimit"],  config["tempFolder"], config["useDisk"]) as filesystem:
+    with B2Fuse(
+        config["accountId"], config["applicationKey"], config["bucketId"],
+        config["enableHashfiles"], config["memoryLimit"], config["tempFolder"], config["useDisk"]
+    ) as filesystem:
         FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)

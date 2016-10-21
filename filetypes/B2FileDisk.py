@@ -42,10 +42,10 @@ class B2FileDisk(object):
     def __getitem__(self, key):
         if isinstance(key, slice):
             self.temp_file.seek(key.start)
-            return array.array('c',self.temp_file.read(key.stop-key.start))
+            return array.array('c', self.temp_file.read(key.stop - key.start))
 
         self.temp_file.seek(key)
-        return array.array('c',self.temp_file.read(1))
+        return array.array('c', self.temp_file.read(1))
 
     #def __getslice__(self, i, j):
     #    return self.__getitem__(slice(i, j))
@@ -53,10 +53,8 @@ class B2FileDisk(object):
     def __len__(self):
         return os.path.getsize(self.temp_filename)
 
-
     def delete(self):
         os.remove(self.temp_filename)
 
     def __del__(self):
         self.delete()
-

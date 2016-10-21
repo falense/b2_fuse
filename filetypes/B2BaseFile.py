@@ -38,4 +38,3 @@ class B2BaseFile(object):
 
     def upload(self):
         raise NotImplemented()
-

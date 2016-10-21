@@ -31,7 +31,7 @@ class B2HashFile(object):
         self.b2fuse = b2fuse
 
         file_hash = self.b2fuse.bucket_api.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
-        self.data = array.array('c',file_hash.encode("utf-8"))
+        self.data = array.array('c', file_hash.encode("utf-8"))
 
     #def __getitem__(self, key):
     #    if isinstance(key, slice):
@@ -40,7 +40,6 @@ class B2HashFile(object):
 
     #def __getslice__(self, i, j):
     #    return self.__getitem__(slice(i, j))
-
 
     def __len__(self):
         return len(self.data)
@@ -53,4 +52,3 @@ class B2HashFile(object):
 
     def read(self, offset, length):
         return self.data
-

@@ -23,6 +23,7 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
+
 class Directory(object):
     def __init__(self, name):
         self._name = name
@@ -67,6 +68,7 @@ class Directory(object):
 
         return directories + files
 
+
 class DirectoryStructure(object):
     def __init__(self):
         self._directories = Directory("")
@@ -78,7 +80,9 @@ class DirectoryStructure(object):
         for directory in local_directories_split:
             self._lookup(self._directories, directory, True)
 
-        online_directories_split  = map(lambda file_info: file_info['fileName'].split("/")[:-1], file_info_list)
+        online_directories_split = map(
+            lambda file_info: file_info['fileName'].split("/")[:-1], file_info_list
+        )
         for directory in online_directories_split:
             self._lookup(self._directories, directory, True)
 

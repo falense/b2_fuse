@@ -43,15 +43,18 @@ from cached_bucket import CachedBucket
 
 B2File = B2SequentialFileMemory
 
+
 class B2Fuse(Operations):
-    def __init__(self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder, use_disk ):
+    def __init__(
+        self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder,
+        use_disk
+    ):
         account_info = InMemoryAccountInfo()
         self.api = B2Api(account_info)
         self.api.authorize_account('production', account_id, application_key)
         self.bucket_api = CachedBucket(self.api, bucket_id)
 
-        self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
-
+        self.logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
         self.enable_hashfiles = enable_hashfiles
         self.memory_limit = memory_limit
@@ -76,8 +79,6 @@ class B2Fuse(Operations):
     def __exit__(self, *args, **kwargs):
         return
 
-
-
     # Helper methods
     # ==================
 
@@ -101,7 +102,7 @@ class B2Fuse(Operations):
 
         memory = sum(open_file_sizes)
 
-        return float(memory)/(1024*1024)
+        return float(memory) / (1024 * 1024)
 
     def _get_cloud_space_consumption(self):
 
@@ -123,7 +124,6 @@ class B2Fuse(Operations):
         online_files = self.bucket_api.list_file_names()['files']
         self._directories.update_structure(online_files, self.local_directories)
 
-
     def _remove_local_file(self, path, delete_online=True):
         if path in self.open_files.keys():
             self.open_files[path].delete(delete_online)
@@ -137,10 +137,8 @@ class B2Fuse(Operations):
             path = path[1:]
         return path
 
-
     # Filesystem methods
     # ==================
-
 
     def access(self, path, mode):
         self.logger.debug("Access %s (mode:%s)", path, mode)
@@ -152,7 +150,7 @@ class B2Fuse(Operations):
 
         #Return access granted if path is a file
         if self._exists(path):
-            return 
+            return
 
         raise FuseOSError(errno.EACCES)
 
@@ -164,12 +162,18 @@ class B2Fuse(Operations):
 
     def getattr(self, path, fh=None):
         self.logger.debug("Get attr %s", path)
-        self.logger.debug("Memory used %s", round(self._get_memory_consumption(),2))
+        self.logger.debug("Memory used %s", round(self._get_memory_consumption(), 2))
         path = self._remove_start_slash(path)
 
         #Check if path is a directory
         if self._directories.is_directory(path):
-            return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(), st_mtime=time(), st_atime=time(), st_nlink=2)
+            return dict(
+                st_mode=(S_IFDIR | 0777),
+                st_ctime=time(),
+                st_mtime=time(),
+                st_atime=time(),
+                st_nlink=2
+            )
 
         #Check if path is a file
         elif self._exists(path):
@@ -179,22 +183,42 @@ class B2Fuse(Operations):
             if path in online_files:
                 #print "File is in bucket"
                 file_info = self._directories.get_file_info(path)
-                return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
+                return dict(
+                    st_mode=(S_IFREG | 0777),
+                    st_ctime=file_info['uploadTimestamp'],
+                    st_mtime=file_info['uploadTimestamp'],
+                    st_atime=file_info['uploadTimestamp'],
+                    st_nlink=1,
+                    st_size=file_info['size']
+                )
 
             elif path.endswith(".sha1"):
                 #print "File is just a hash"
-                return dict(st_mode=(S_IFREG | 0444), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=42)
+                return dict(
+                    st_mode=(S_IFREG | 0444),
+                    st_ctime=0,
+                    st_mtime=0,
+                    st_atime=0,
+                    st_nlink=1,
+                    st_size=42
+                )
 
             else:
                 #print "File exists only locally"
-                return dict(st_mode=(S_IFREG | 0777), st_ctime=0, st_mtime=0, st_atime=0, st_nlink=1, st_size=len(self.open_files[path]))
+                return dict(
+                    st_mode=(S_IFREG | 0777),
+                    st_ctime=0,
+                    st_mtime=0,
+                    st_atime=0,
+                    st_nlink=1,
+                    st_size=len(self.open_files[path])
+                )
 
         raise FuseOSError(errno.ENOENT)
 
     def readdir(self, path, fh):
         self.logger.debug("Readdir %s", path)
         path = self._remove_start_slash(path)
-
 
         self._update_directory_structure()
 
@@ -211,7 +235,6 @@ class B2Fuse(Operations):
                     return True
 
             return False
-
 
         #Add files found in bucket
         directory = self._directories.get_directory(path)
@@ -237,7 +260,7 @@ class B2Fuse(Operations):
 
         #If filenames has a prefix (relative to path) remove this
         if len(path) > 0:
-            dirents = map(lambda f: f[len(path)+1:], dirents)
+            dirents = map(lambda f: f[len(path) + 1:], dirents)
 
         #Add hash files
         if self.enable_hashfiles:
@@ -246,7 +269,7 @@ class B2Fuse(Operations):
 
         #Add directories
         dirents.extend(['.', '..'])
-        dirents.extend(map(str,self._directories.get_directories(path)))
+        dirents.extend(map(str, self._directories.get_directories(path)))
 
         return dirents
 
@@ -284,7 +307,9 @@ class B2Fuse(Operations):
             dirents.append(filename)
 
         for filename in dirents:
-            online_files = [(f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']]
+            online_files = [
+                (f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']
+            ]
             fileName_to_fileId = dict(online_files)
             self.api.delete_file_version(fileName_to_fileId[path], path)
 
@@ -292,7 +317,7 @@ class B2Fuse(Operations):
 
         if self._directories.is_directory(path):
             if path in self.local_directories:
-                i =  self.local_directories.index(path)
+                i = self.local_directories.index(path)
                 self.local_directories.pop(i)
 
     def mkdir(self, path, mode):
@@ -306,11 +331,15 @@ class B2Fuse(Operations):
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
-        block_size = 4096*16 
-        total_block_count = 1024**4 #1 Petabyte
-        free_block_count = total_block_count - self._get_cloud_space_consumption()/block_size
-        return dict(f_bsize=block_size, f_blocks=total_block_count, f_bfree=free_block_count, f_bavail=free_block_count)
-
+        block_size = 4096 * 16
+        total_block_count = 1024**4  #1 Petabyte
+        free_block_count = total_block_count - self._get_cloud_space_consumption() / block_size
+        return dict(
+            f_bsize=block_size,
+            f_blocks=total_block_count,
+            f_bfree=free_block_count,
+            f_bavail=free_block_count
+        )
 
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
@@ -322,7 +351,6 @@ class B2Fuse(Operations):
         self._remove_local_file(path)
 
         self._update_directory_structure()
-
 
     def rename(self, old, new):
         self.logger.debug("Rename old: %s, new %s", old, new)
@@ -336,17 +364,15 @@ class B2Fuse(Operations):
         if self._exists(new):
             self.unlink(new)
 
-
-        self.open(old,0)
+        self.open(old, 0)
         self.open_files[old]
-        self.release(old,0)
+        self.release(old, 0)
 
-        self.create(new,0)
+        self.create(new, 0)
         self.write(new, self.open_files[old], 0, 0)
         self.release(new, 0)
 
         self.unlink(old)
-
 
     def utimens(self, path, times=None):
         self.logger.debug("Utimens %s", path)
@@ -379,7 +405,7 @@ class B2Fuse(Operations):
         file_info = {}
         file_info['fileName'] = path
 
-        self.open_files[path] = B2File(self, file_info, True) #array.array('c')
+        self.open_files[path] = B2File(self, file_info, True)  #array.array('c')
 
         self.fd += 1
         return self.fd
@@ -413,10 +439,6 @@ class B2Fuse(Operations):
         self.logger.debug("Release %s %s", path, fh)
 
         self.logger.debug("Flushing file in case it was dirty")
-        self.flush(self._remove_start_slash(path),fh)
+        self.flush(self._remove_start_slash(path), fh)
 
         self._remove_local_file(path, False)
-
-
-
-
