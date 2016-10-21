@@ -128,10 +128,14 @@ class B2Fuse(Operations):
         online_files = self.bucket_api.list_file_names()['files']
         self._directories.update_structure(online_files, self.local_directories)
     
-    def _remove_local_file(self, path):
+    
+    def _remove_local_file(self, path, delete_online=True):
         if path in self.open_files.keys():
-            self.open_files[path].delete()
+            self.open_files[path].delete(delete_online)
             del self.open_files[path]
+        elif delete_online:
+            file_info = self._directories.get_file_info(path)
+            self.bucket_api.delete_file_version(file_info['fileId'], file_info['fileName'])
             
     def _remove_start_slash(self, path):
         if path.startswith("/"):
@@ -321,6 +325,8 @@ class B2Fuse(Operations):
             return
         
         self._remove_local_file(path)
+        
+        self._update_directory_structure()
 
 
     def rename(self, old, new):
@@ -414,6 +420,8 @@ class B2Fuse(Operations):
             
         self.logger.debug("Flushing file in case it was dirty")
         self.flush(self._remove_start_slash(path),fh)
+        
+        self._remove_local_file(path, False)
 
         
 

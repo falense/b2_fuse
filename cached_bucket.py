@@ -83,4 +83,13 @@ class CachedBucket(Bucket):
             result = super(CachedBucket, self).list_file_names() 
             return self._update_cache(func_name, result)
 
-    
+    def delete_file_version(self, *args, **kwargs):
+        self._reset_cache()
+        return super(CachedBucket, self).delete_file_version(*args, **kwargs)
+        
+    def download_file_by_id(self, *args, **kwargs):
+        self._reset_cache()
+        return super(CachedBucket, self).download_file_by_id(*args, **kwargs)
+        
+        
+        

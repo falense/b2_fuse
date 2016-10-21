@@ -86,7 +86,6 @@ class DirectoryStructure(object):
             folder_path_split = file_info['fileName'].split("/")[:-1]
             folder_path = "/".join(folder_path_split)
             directory = self.get_directory(folder_path)
-            print type(directory)
             directory.add_file(file_info)
             
     def _lookup(self, directory, path, update=False):
@@ -137,7 +136,6 @@ class DirectoryStructure(object):
         
         directory = self._lookup(self._directories, file_path)
         
-        print "file_info", path, directory.get_content_names()
         if directory is not None:
             return directory.get_file_info(filename)
         else:
