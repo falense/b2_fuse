@@ -24,12 +24,12 @@
 #SOFTWARE.
 
 import array
-
 import logging
+
+from b2.download_dest import DownloadDestBytes
         
 from B2BaseFile import B2BaseFile
 
-from b2.download_dest import DownloadDestBytes
 
 class B2SequentialFileMemory(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):

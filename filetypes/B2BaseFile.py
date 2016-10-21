@@ -24,19 +24,13 @@
 #SOFTWARE.
 
 import array
-
 import logging
+
 class B2BaseFile(object):
     def __init__(self, b2fuse, file_info):
         self.b2fuse = b2fuse
         
         self.file_info = file_info
-        
-    def __getitem__(self, key):
-        raise NotImplemented()
-        
-    def __setitem__(self, key, value):
-        raise NotImplemented()
         
     def __len__(self):
         raise NotImplemented()

@@ -23,8 +23,6 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-from collections import defaultdict
-
 import os
 import sys
 import errno
@@ -32,19 +30,18 @@ import logging
 import array
 import shutil
 
+from collections import defaultdict
 from fuse import FUSE, FuseOSError, Operations
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from time import time
 
-from filetypes.B2SparseFileMemory import B2SparseFileMemory
-from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
-from filetypes.B2HashFile import B2HashFile
-
-from directory_structure import DirectoryStructure
-
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
 
+from filetypes.B2SparseFileMemory import B2SparseFileMemory
+from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
+from filetypes.B2HashFile import B2HashFile
+from directory_structure import DirectoryStructure
 from cached_bucket import CachedBucket
 
 B2File = B2SequentialFileMemory
@@ -82,7 +79,9 @@ class B2Fuse(Operations):
     def __exit__(self, *args, **kwargs):
         return
         
-    # Filesystem methods
+    
+    
+    # Helper methods
     # ==================
     
     def _exists(self, path, include_hash=True):
@@ -122,10 +121,26 @@ class B2Fuse(Operations):
             for file_info in directory.get_file_infos():
                 space_consumption += file_info['contentLength']
                 
-        print space_consumption
         return space_consumption
         
+    def _update_directory_structure(self):
+        #Update the directory structure with online files and local directories
+        online_files = self.bucket_api.list_file_names()['files']
+        self._directories.update_structure(online_files, self.local_directories)
+    
+    def _remove_local_file(self, path):
+        if path in self.open_files.keys():
+            self.open_files[path].delete()
+            del self.open_files[path]
+            
+    def _remove_start_slash(self, path):
+        if path.startswith("/"):
+            path = path[1:]
+        return path
         
+        
+    # Filesystem methods
+    # ==================
         
         
     def access(self, path, mode):
@@ -289,11 +304,6 @@ class B2Fuse(Operations):
         
         self._update_directory_structure()
         
-    def _update_directory_structure(self):
-        #Update the directory structure with online files and local directories
-        online_files = self.bucket_api.list_file_names()['files']
-        self._directories.update_structure(online_files, self.local_directories)
-    
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
@@ -302,10 +312,6 @@ class B2Fuse(Operations):
         free_block_count = total_block_count - self._get_cloud_space_consumption()/block_size
         return dict(f_bsize=block_size, f_blocks=total_block_count, f_bfree=free_block_count, f_bavail=free_block_count)
 
-    def _remove_local_file(self, path):
-        if path in self.open_files.keys():
-            self.open_files[path].delete()
-            del self.open_files[path]
 
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
@@ -396,7 +402,7 @@ class B2Fuse(Operations):
             
         path = self._remove_start_slash(path)
         self.open_files[path].set_dirty(True)
-        self.open_files[path].truncate(length)# = self.open_files[path][:length]
+        self.open_files[path].truncate(length)
 
     def flush(self, path, fh):
         self.logger.debug("Flush %s %s", path, fh)
@@ -409,10 +415,6 @@ class B2Fuse(Operations):
         self.logger.debug("Flushing file in case it was dirty")
         self.flush(self._remove_start_slash(path),fh)
 
-    def _remove_start_slash(self, path):
-        if path.startswith("/"):
-            path = path[1:]
-        return path
         
 
     

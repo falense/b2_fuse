@@ -24,7 +24,6 @@
 #SOFTWARE.
 
 import array
-
 import logging
         
 class B2HashFile(object):
