@@ -36,119 +36,19 @@ from fuse import FUSE, FuseOSError, Operations
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from time import time
 
-from buckettypes.b2bucket import B2Bucket
-from buckettypes.b2bucket_cached import B2BucketCached
-
 from filetypes.B2SparseFileMemory import B2SparseFileMemory
 from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
 from filetypes.B2HashFile import B2HashFile
 
-class DirectoryStructure(object):
-    def __init__(self):
-        self._folders = {}
-        
-    def update_structure(self, file_list, local_directories):
-        folder_list = map(lambda f: f.split("/")[:-1], file_list)
-        folder_list.extend(map(lambda f: f.split("/"), local_directories))
-        
-        self._folders = {}
-        for folder in folder_list:
-            self._lookup(self._folders, folder,True)
-            
-    def _lookup(self, folders, path, update=False):
-        if len(path) == 0:
-            return folders
-            
-        head = path.pop(0)
-        if update and folders.get(head) is None:
-            folders[head] = {}
-        
-        if folders.get(head) is not None:
-            return self._lookup(folders[head], path, update)
-        else:
-            return None
-        
-    def is_directory(self, path):
-        return self.get_directories(path) is not None
-            
-    def get_directories(self, path):
-        if len(path) == 0:
-            return self._folders.keys()
-        else:
-            path_split = path.split("/")
-            r = self._lookup(self._folders, path_split)
-            
-            if r is not None:
-                return r.keys()
-            else:
-                return None
-                
-    def get_file_info(self, path):
-        return
+from directory_structure import DirectoryStructure
 
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
-from b2.bucket import Bucket
+
+from cached_bucket import CachedBucket
 
 B2File = B2SequentialFileMemory
 
-#General cache used for B2Bucket
-class Cache(object):
-    def __init__(self, cache_timeout):
-        self.data = {}
-        
-        self.cache_timeout = cache_timeout
-        
-    def update(self, result, params = ""):
-        self.data[params] = (time(), result)
-        
-    def get(self, params = ""):
-        if self.data.get(params) is not None:
-            entry_time, result = self.data.get(params)
-            if time() - entry_time < self.cache_timeout:
-                return result
-            else:
-                del self.data[params]
-        
-        return
-
-class CacheNotFound(BaseException):
-    pass
-
-class CachedBucket(Bucket):
-    def __init__(self, api, bucket_id):
-        super(CachedBucket, self).__init__(api, bucket_id)
-        
-        self._cache = {}
-        
-        self._cache_timeout = 120
-        
-    def _reset_cache(self):
-        self._cache = {}
-        
-    def _update_cache(self, cache_name, result, params=""):
-        self._cache[cache_name].update(result, params)
-        return result
-        
-    def _get_cache(self, cache_name, params="", cache_type=Cache):
-        if self._cache.get(cache_name) is None:
-            self._cache[cache_name] = cache_type(self._cache_timeout)
-            
-        if self._cache[cache_name].get(params) is not None:
-            return self._cache[cache_name].get(params)
-            
-        raise CacheNotFound()
-    
-    def list_file_names(self):
-        func_name = "list_file_names"
-        
-        try:
-            return self._get_cache(func_name)
-        except CacheNotFound:
-            result = super(CachedBucket, self).list_file_names() 
-            return self._update_cache(func_name, result)
-
-    
 class B2Fuse(Operations):
     def __init__(self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder, use_disk ):
         account_info = InMemoryAccountInfo()
@@ -158,7 +58,6 @@ class B2Fuse(Operations):
         
         self.logger = logging.getLogger("%s.%s" % (__name__,self.__class__.__name__))
         
-        self.bucket = B2BucketWrapper(account_id, application_key, bucket_id)  
             
         self.enable_hashfiles = enable_hashfiles
         self.memory_limit = memory_limit
@@ -170,7 +69,7 @@ class B2Fuse(Operations):
                 shutil.rmtree(self.temp_folder)
             os.makedirs(self.temp_folder)
             
-        self.directories = DirectoryStructure()
+        self._directories = DirectoryStructure()
         self.local_directories = []
           
         self.open_files = defaultdict(B2File)
@@ -181,7 +80,7 @@ class B2Fuse(Operations):
         return self
         
     def __exit__(self, *args, **kwargs):
-        self.bucket.__exit__()
+        return
         
     # Filesystem methods
     # ==================
@@ -192,10 +91,10 @@ class B2Fuse(Operations):
             path = path[:-5]
         
         #File is in bucket
-        
-        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
-        if path in online_files:
+        if self._directories.is_file(path):
             return True
+        else:
+            print "file is not in dir struct", path
         
         #File is open (but possibly not in bucket)
         if path in self.open_files.keys():
@@ -215,7 +114,7 @@ class B2Fuse(Operations):
         path = self._remove_start_slash(path)
             
         #Return access granted if path is a directory
-        if self.directories.is_directory(path):
+        if self._directories.is_directory(path):
             return
             
         #Return access granted if path is a file
@@ -236,7 +135,7 @@ class B2Fuse(Operations):
         path = self._remove_start_slash(path)
         
         #Check if path is a directory
-        if self.directories.is_directory(path):
+        if self._directories.is_directory(path):
             return dict(st_mode=(S_IFDIR | 0777), st_ctime=time(), st_mtime=time(), st_atime=time(), st_nlink=2)
             
         #Check if path is a file
@@ -246,7 +145,7 @@ class B2Fuse(Operations):
             online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
             if path in online_files:
                 #print "File is in bucket"
-                file_info = self.bucket.get_file_info(path)
+                file_info = self._directories.get_file_info(path)
                 return dict(st_mode=(S_IFREG | 0777), st_ctime=file_info['uploadTimestamp'], st_mtime=file_info['uploadTimestamp'], st_atime=file_info['uploadTimestamp'], st_nlink=1, st_size=file_info['size'])
                 
             elif path.endswith(".sha1"):
@@ -263,11 +162,9 @@ class B2Fuse(Operations):
         self.logger.debug("Readdir %s", path)
         path = self._remove_start_slash(path)
 
-        #Update the local filestructure
-        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
         
-        self.directories.update_structure(online_files + self.open_files.keys(), self.local_directories)
-         
+        self._update_directory_structure()
+        
         dirents = []
         
         def in_folder(filename):
@@ -284,11 +181,10 @@ class B2Fuse(Operations):
             
             
         #Add files found in bucket
+        directory = self._directories.get_directory(path)
         
-        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
-        for filename in online_files:
-            if in_folder(filename):
-                dirents.append(filename)
+        online_files = map(lambda file_info: file_info['fileName'], directory.get_file_infos())
+        dirents.extend(online_files)
         
         #Add files kept in local memory
         for filename in self.open_files.keys():
@@ -317,7 +213,7 @@ class B2Fuse(Operations):
         
         #Add directories
         dirents.extend(['.', '..'])
-        dirents.extend(self.directories.get_directories(path))
+        dirents.extend(map(str,self._directories.get_directories(path)))
         
         return dirents
 
@@ -361,7 +257,7 @@ class B2Fuse(Operations):
             
             self._remove_local_file(filename)
                 
-        if self.directories.is_directory(path):
+        if self._directories.is_directory(path):
             if path in self.local_directories:
                 i =  self.local_directories.index(path)
                 self.local_directories.pop(i)
@@ -372,11 +268,13 @@ class B2Fuse(Operations):
         
         self.local_directories.append(path)
         
-        #Update the local filestructure
+        self._update_directory_structure()
         
-        online_files = [(f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']]
-        self.directories.update_structure(online_files + self.open_files.keys(), self.local_directories)
-        
+    def _update_directory_structure(self):
+        #Update the directory structure with online files and local directories
+        online_files = self.bucket_api.list_file_names()['files']
+        self._directories.update_structure(online_files, self.local_directories)
+    
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
@@ -385,9 +283,7 @@ class B2Fuse(Operations):
     def _remove_local_file(self, path):
         if path in self.open_files.keys():
             self.open_files[path].delete()
-            
             del self.open_files[path]
-            
 
     def unlink(self, path):
         self.logger.debug("Unlink %s", path)
@@ -395,12 +291,6 @@ class B2Fuse(Operations):
             
         if not self._exists(path, include_hash=False):
             return
-            
-            
-        online_files = [(f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']]
-        fileName_to_fileId = dict(online_files)
-        self.api.delete_file_version(fileName_to_fileId[path], path)
-        
         
         self._remove_local_file(path)
 
@@ -446,7 +336,9 @@ class B2Fuse(Operations):
             self.open_files[path] = B2HashFile(self, path)
             
         elif self.open_files.get(path) is None:
-            self.open_files[path] = B2File(self, path)
+            file_info = self._directories.get_file_info(path)
+            print file_info
+            self.open_files[path] = B2File(self, file_info)
   
         self.fd += 1
         return self.fd
@@ -455,7 +347,11 @@ class B2Fuse(Operations):
         self.logger.debug("Create %s (mode:%s)", path, mode)
             
         path = self._remove_start_slash(path)
-        self.open_files[path] = B2File(self, path, True) #array.array('c')
+        
+        file_info = {}
+        file_info['fileName'] = path
+        
+        self.open_files[path] = B2File(self, file_info, True) #array.array('c')
         
         self.fd += 1
         return self.fd

@@ -47,5 +47,3 @@ class B2BaseFile(object):
     def upload(self):
         raise NotImplemented()
         
-    def __del__(self):
-        self.delete()

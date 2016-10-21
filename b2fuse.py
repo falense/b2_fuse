@@ -36,11 +36,11 @@ def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("mountpoint", type=str, help="Mountpoint for the B2 bucket")
     
-    parser.add_argument('--enable_hashfiles', dest='feature', action='store_true')
-    parser.set_defaults(enable_hashfiles=True)
+    parser.add_argument('--enable_hashfiles', dest='enable_hashfiles', action='store_true')
+    parser.set_defaults(enable_hashfiles=False)
     
-    parser.add_argument('--use_disk', dest='feature', action='store_true')
-    parser.set_defaults(use_disk=True)
+    parser.add_argument('--use_disk', dest='use_disk', action='store_true')
+    parser.set_defaults(use_disk=False)
     
     parser.add_argument("--account_id", type=str, default=None, help="Account ID for your B2 account (overrides config)")
     parser.add_argument("--application_key", type=str, default=None, help="Application key for your account  (overrides config)")
@@ -79,6 +79,9 @@ if __name__ == '__main__':
         
     if args.enable_hashfiles:
         config["enableHashfiles"] = args.enable_hashfiles
+    else:
+        config["enableHashfiles"] = False
+        
         
     if args.memory_limit:
         config["memoryLimit"] = args.memory_limit
@@ -88,6 +91,8 @@ if __name__ == '__main__':
         
     if args.use_disk:
         config["useDisk"] = args.use_disk
+    else:
+        config["useDisk"] = False
     
     with B2Fuse(config["accountId"], config["applicationKey"], config["bucketId"], config["enableHashfiles"], config["memoryLimit"],  config["tempFolder"], config["useDisk"]) as filesystem:
         FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)

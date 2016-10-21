@@ -29,6 +29,8 @@ import logging
         
 from B2BaseFile import B2BaseFile
 
+from b2.download_dest import DownloadDestBytes
+
 class B2SequentialFileMemory(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):
         super(B2SequentialFileMemory, self).__init__(b2fuse, file_info)
@@ -38,7 +40,10 @@ class B2SequentialFileMemory(B2BaseFile):
             self.data = array.array('c')
             self._dirty = True
         else:
-            self.data = array.array('c',self.bucket_api.download_file_by_id(self.file_info['fileId']))
+            download_dest = DownloadDestBytes()
+            self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
+            print  download_dest.bytes_io.read()
+            self.data = array.array('c', download_dest.bytes_io.read())
             
     #def __getitem__(self, key):
         #if isinstance(key, slice):
@@ -47,8 +52,9 @@ class B2SequentialFileMemory(B2BaseFile):
         
     def upload(self):
         if self._dirty:
-            self.b2fuse.bucket.put_file(self.file_info['fileName'], self.data)
-        
+            print self.file_info
+            self.b2fuse.bucket_api.upload_bytes(bytes(self.data), self.file_info['fileName'])
+            
         self._dirty = False
         
     #def __setitem__(self, key, value):
@@ -77,4 +83,5 @@ class B2SequentialFileMemory(B2BaseFile):
         self._dirty = new_value
         
     def delete(self):
+        self.b2fuse.api.delete_file_version(self.file_info['fileId'], self.file_info['fileName'])
         del self.data

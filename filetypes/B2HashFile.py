@@ -31,7 +31,7 @@ class B2HashFile(object):
     def __init__(self, b2fuse, path):
         self.b2fuse = b2fuse
         
-        file_hash = self.b2fuse.bucket.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
+        file_hash = self.b2fuse.bucket_api.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
         self.data = array.array('c',file_hash.encode("utf-8"))
         
     #def __getitem__(self, key):
