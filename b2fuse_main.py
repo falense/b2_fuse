@@ -92,8 +92,6 @@ class B2Fuse(Operations):
         #File is in bucket
         if self._directories.is_file(path):
             return True
-        else:
-            print "file is not in dir struct", path
         
         #File is open (but possibly not in bucket)
         if path in self.open_files.keys():
@@ -371,7 +369,6 @@ class B2Fuse(Operations):
             
         elif self.open_files.get(path) is None:
             file_info = self._directories.get_file_info(path)
-            print file_info
             self.open_files[path] = B2File(self, file_info)
   
         self.fd += 1
