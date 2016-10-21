@@ -24,6 +24,7 @@
 #SOFTWARE.
 
 import array
+import os
 
 
 class B2FileDisk(object):
