@@ -109,6 +109,25 @@ class B2Fuse(Operations):
         
         return float(memory)/(1024*1024)
         
+    def _get_cloud_space_consumption(self):
+        
+        directories = [self._directories._directories]
+        
+        space_consumption = 0
+        while len(directories) > 0:
+            directory = directories.pop(0)
+            
+            directories.extend(directory.get_directories())
+            
+            for file_info in directory.get_file_infos():
+                space_consumption += file_info['contentLength']
+                
+        print space_consumption
+        return space_consumption
+        
+        
+        
+        
     def access(self, path, mode):
         self.logger.debug("Access %s (mode:%s)", path, mode)
         path = self._remove_start_slash(path)
@@ -278,7 +297,10 @@ class B2Fuse(Operations):
     def statfs(self, path):
         self.logger.debug("Fetching file system stats %s", path)
         #Returns 1 petabyte free space, arbitrary number
-        return dict(f_bsize=4096*16, f_blocks=1024**4, f_bfree=1024**4, f_bavail=1024**4)
+        block_size = 4096*16 
+        total_block_count = 1024**4 #1 Petabyte
+        free_block_count = total_block_count - self._get_cloud_space_consumption()/block_size
+        return dict(f_bsize=block_size, f_blocks=total_block_count, f_bfree=free_block_count, f_bavail=free_block_count)
 
     def _remove_local_file(self, path):
         if path in self.open_files.keys():
