@@ -338,7 +338,7 @@ class B2Fuse(Operations):
             
             
         self.open(old,0)
-        data = self.open_files[old]
+        self.open_files[old]
         self.release(old,0)
             
         self.create(new,0)
