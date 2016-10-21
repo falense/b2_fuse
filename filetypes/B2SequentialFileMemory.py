@@ -33,7 +33,7 @@ from B2BaseFile import B2BaseFile
 class B2SequentialFileMemory(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):
         super(B2SequentialFileMemory, self).__init__(b2fuse, file_info)
-        
+
         self._dirty = False
         if new_file:
             self.data = array.array('c')
@@ -42,46 +42,46 @@ class B2SequentialFileMemory(B2BaseFile):
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
             self.data = array.array('c', download_dest.bytes_io.getvalue())
-            
+
     #def __getitem__(self, key):
         #if isinstance(key, slice):
             #return self.data[key.start:key.stop] 
         #return self.data[key]
-        
+
     def upload(self):
         if self._dirty:
             self.b2fuse.bucket_api.upload_bytes(bytes(self.data), self.file_info['fileName'])
             self.b2fuse._update_directory_structure()
             self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
-            
-        
+
+
         self._dirty = False
-        
+
     #def __setitem__(self, key, value):
     #    self.data[key] = value
-        
+
     def __len__(self):
         return len(self.data)
-        
+
     #def __del__(self):
     #    self.delete()
-    
-        
+
+
     def write(self, offset, data):
         if offset == len(self):
             self.data.extend(data)
         else:
             raise NotImplemented()
-            
+
     def read(self, offset, length):
         return self.data[offset: offset+length]
-        
+
     def truncate(self, length):
         self.data = self.data[:length]
-        
+
     def set_dirty(self, new_value):
         self._dirty = new_value
-        
+
     def delete(self, delete_online):
         if delete_online:
             self.b2fuse.bucket_api.delete_file_version(self.file_info['fileId'], self.file_info['fileName'])

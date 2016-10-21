@@ -29,28 +29,28 @@ import array
 class B2HashFile(object):
     def __init__(self, b2fuse, path):
         self.b2fuse = b2fuse
-        
+
         file_hash = self.b2fuse.bucket_api.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
         self.data = array.array('c',file_hash.encode("utf-8"))
-        
+
     #def __getitem__(self, key):
     #    if isinstance(key, slice):
     #        return self.data[key.start:key.stop] 
     #    return self.data[key]
-        
+
     #def __getslice__(self, i, j):
     #    return self.__getitem__(slice(i, j))
-        
-        
+
+
     def __len__(self):
         return len(self.data)
-        
+
     def upload(self):
         return
-        
+
     def write(self, offset, data):
         return
-        
+
     def read(self, offset, length):
         return self.data
-        
+

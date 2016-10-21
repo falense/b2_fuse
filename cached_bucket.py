@@ -31,12 +31,12 @@ from b2.bucket import Bucket
 class Cache(object):
     def __init__(self, cache_timeout):
         self.data = {}
-        
+
         self.cache_timeout = cache_timeout
-        
+
     def update(self, result, params = ""):
         self.data[params] = (time(), result)
-        
+
     def get(self, params = ""):
         if self.data.get(params) is not None:
             entry_time, result = self.data.get(params)
@@ -44,7 +44,7 @@ class Cache(object):
                 return result
             else:
                 del self.data[params]
-        
+
         return
 
 class CacheNotFound(BaseException):
@@ -53,30 +53,30 @@ class CacheNotFound(BaseException):
 class CachedBucket(Bucket):
     def __init__(self, api, bucket_id):
         super(CachedBucket, self).__init__(api, bucket_id)
-        
+
         self._cache = {}
-        
+
         self._cache_timeout = 120
-        
+
     def _reset_cache(self):
         self._cache = {}
-        
+
     def _update_cache(self, cache_name, result, params=""):
         self._cache[cache_name].update(result, params)
         return result
-        
+
     def _get_cache(self, cache_name, params="", cache_type=Cache):
         if self._cache.get(cache_name) is None:
             self._cache[cache_name] = cache_type(self._cache_timeout)
-            
+
         if self._cache[cache_name].get(params) is not None:
             return self._cache[cache_name].get(params)
-            
+
         raise CacheNotFound()
-    
+
     def list_file_names(self):
         func_name = "list_file_names"
-        
+
         try:
             return self._get_cache(func_name)
         except CacheNotFound:
@@ -86,10 +86,10 @@ class CachedBucket(Bucket):
     def delete_file_version(self, *args, **kwargs):
         self._reset_cache()
         return super(CachedBucket, self).delete_file_version(*args, **kwargs)
-        
+
     def download_file_by_id(self, *args, **kwargs):
         self._reset_cache()
         return super(CachedBucket, self).download_file_by_id(*args, **kwargs)
-        
-        
-        
+
+
+

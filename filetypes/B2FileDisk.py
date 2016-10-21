@@ -30,33 +30,33 @@ import os
 class B2FileDisk(object):
     def __init__(self, b2fuse, path):
         self.b2fuse = b2fuse
-        
+
         self.temp_filename = os.path.join(self.b2fuse.temp_folder, path)
         os.makedirs(self.temp_filename)
-        
+
         self.temp_file = open(self.temp_filename, "wr+b")
         data = self.b2fuse.bucket.get_file(path)
-        
+
         self.temp_file.write(data)
-        
+
     def __getitem__(self, key):
         if isinstance(key, slice):
             self.temp_file.seek(key.start)
             return array.array('c',self.temp_file.read(key.stop-key.start))
-        
+
         self.temp_file.seek(key)
         return array.array('c',self.temp_file.read(1))
-        
+
     #def __getslice__(self, i, j):
     #    return self.__getitem__(slice(i, j))
-        
+
     def __len__(self):
         return os.path.getsize(self.temp_filename)
-        
-        
+
+
     def delete(self):
         os.remove(self.temp_filename)
-        
+
     def __del__(self):
         self.delete()
-        
+
