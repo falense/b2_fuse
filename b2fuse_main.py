@@ -365,11 +365,12 @@ class B2Fuse(Operations):
             self.unlink(new)
 
         self.open(old, 0)
-        self.open_files[old]
+        file_size = self.open_files[old]
+        data = self.open_files[old].read(0, file_size)
         self.release(old, 0)
 
         self.create(new, 0)
-        self.write(new, self.open_files[old], 0, 0)
+        self.write(new, data, 0, 0)
         self.release(new, 0)
 
         self.unlink(old)
