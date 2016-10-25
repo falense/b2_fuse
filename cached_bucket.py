@@ -90,6 +90,6 @@ class CachedBucket(Bucket):
         self._reset_cache()
         return super(CachedBucket, self).delete_file_version(*args, **kwargs)
 
-    def download_file_by_id(self, *args, **kwargs):
+    def upload_bytes(self, *args, **kwargs):
         self._reset_cache()
-        return super(CachedBucket, self).download_file_by_id(*args, **kwargs)
+        return super(CachedBucket, self).upload_bytes(*args, **kwargs)
