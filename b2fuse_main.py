@@ -365,7 +365,7 @@ class B2Fuse(Operations):
             self.unlink(new)
 
         self.open(old, 0)
-        file_size = self.open_files[old]
+        file_size = len(self.open_files[old])
         data = self.open_files[old].read(0, file_size)
         self.release(old, 0)
 

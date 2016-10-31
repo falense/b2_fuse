@@ -50,7 +50,7 @@ class B2SequentialFileMemory(B2BaseFile):
 
     def upload(self):
         if self._dirty:
-            self.b2fuse.bucket_api.upload_bytes(bytes(self.data), self.file_info['fileName'])
+            self.b2fuse.bucket_api.upload_bytes(bytes(self.data.tostring()), self.file_info['fileName'])
             self.b2fuse._update_directory_structure()
             self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
 
