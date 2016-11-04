@@ -43,7 +43,6 @@ class B2FileDisk(B2BaseFile):
 
         self._dirty = False
         
-        print folder, self.temp_filename
         if os.path.exists(self.temp_filename):
             os.remove(self.temp_filename)
         
@@ -60,7 +59,11 @@ class B2FileDisk(B2BaseFile):
     def __len__(self):
         return os.path.getsize(self.temp_filename)
 
-    def delete(self):
+    def delete(self, delete_online):
+        if delete_online:
+            self.b2fuse.bucket_api.delete_file_version(
+                self.file_info['fileId'], self.file_info['fileName']
+            )
         self.temp_file.close()
         os.remove(self.temp_filename)
 
