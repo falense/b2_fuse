@@ -33,7 +33,7 @@ from B2BaseFile import B2BaseFile
 class B2SequentialFileMemory(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):
         super(B2SequentialFileMemory, self).__init__(b2fuse, file_info)
-
+        
         self._dirty = False
         if new_file:
             self.data = array.array('c')
@@ -72,7 +72,7 @@ class B2SequentialFileMemory(B2BaseFile):
             raise NotImplemented()
 
     def read(self, offset, length):
-        return self.data[offset:offset + length]
+        return self.data[offset:offset + length].tostring()
 
     def truncate(self, length):
         self.data = self.data[:length]

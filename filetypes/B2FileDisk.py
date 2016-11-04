@@ -25,36 +25,70 @@
 
 import array
 import os
+import os.path
 
+from b2.download_dest import DownloadDestBytes
 
-class B2FileDisk(object):
-    def __init__(self, b2fuse, path):
-        self.b2fuse = b2fuse
+from B2BaseFile import B2BaseFile
 
-        self.temp_filename = os.path.join(self.b2fuse.temp_folder, path)
-        os.makedirs(self.temp_filename)
+class B2FileDisk(B2BaseFile):
+    def __init__(self, b2fuse, file_info, new_file=False):
+        super(B2FileDisk, self).__init__(b2fuse, file_info)
+        
+        self.temp_filename = os.path.join(self.b2fuse.temp_folder, self.file_info['fileName'])
+        
+        folder = os.path.join(self.b2fuse.temp_folder, os.path.dirname(self.file_info['fileName']))
+        if not os.path.exists(folder):
+            os.makedirs(folder)
 
+        self._dirty = False
+        
+        print folder, self.temp_filename
+        if os.path.exists(self.temp_filename):
+            os.remove(self.temp_filename)
+        
         self.temp_file = open(self.temp_filename, "wr+b")
-        data = self.b2fuse.bucket.get_file(path)
-
-        self.temp_file.write(data)
-
-    def __getitem__(self, key):
-        if isinstance(key, slice):
-            self.temp_file.seek(key.start)
-            return array.array('c', self.temp_file.read(key.stop - key.start))
-
-        self.temp_file.seek(key)
-        return array.array('c', self.temp_file.read(1))
-
-    #def __getslice__(self, i, j):
-    #    return self.__getitem__(slice(i, j))
-
+    
+        if new_file:
+            self._dirty = True
+        else:
+            download_dest = DownloadDestBytes()
+            self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
+            self.temp_file.write(download_dest.bytes_io.getvalue())
+            
+        
     def __len__(self):
         return os.path.getsize(self.temp_filename)
 
     def delete(self):
+        self.temp_file.close()
         os.remove(self.temp_filename)
 
-    def __del__(self):
-        self.delete()
+    #def __del__(self):
+    #    self.delete()
+        
+    def upload(self):
+        if self._dirty:
+            data = self.read(0,len(self))
+            self.b2fuse.bucket_api.upload_bytes(bytes(data), self.file_info['fileName'])
+            self.b2fuse._update_directory_structure()
+            self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
+
+        self._dirty = False
+
+    def write(self, offset, data):
+        self.temp_file.seek(offset)
+        self.temp_file.write(data)
+        self.temp_file.flush()
+
+    def read(self, offset, length):
+        self.temp_file.seek(offset)
+        return self.temp_file.read(length)
+
+    def truncate(self, length):
+        self.temp_file.seek(0)
+        self.temp_file.truncate(length)
+
+    def set_dirty(self, new_value):
+        self._dirty = new_value
+

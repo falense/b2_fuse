@@ -37,11 +37,11 @@ from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
 
 from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
+from filetypes.B2FileDisk import B2FileDisk
 from filetypes.B2HashFile import B2HashFile
 from directory_structure import DirectoryStructure
 from cached_bucket import CachedBucket
 
-B2File = B2SequentialFileMemory
 
 
 class B2Fuse(Operations):
@@ -65,11 +65,14 @@ class B2Fuse(Operations):
             if os.path.exists(self.temp_folder):
                 shutil.rmtree(self.temp_folder)
             os.makedirs(self.temp_folder)
+            self.B2File = B2FileDisk
+        else:
+            self.B2File = B2SequentialFileMemory
 
         self._directories = DirectoryStructure()
         self.local_directories = []
 
-        self.open_files = defaultdict(B2File)
+        self.open_files = defaultdict(self.B2File)
 
         self.fd = 0
 
@@ -77,6 +80,9 @@ class B2Fuse(Operations):
         return self
 
     def __exit__(self, *args, **kwargs):
+        if os.path.exists(self.temp_folder):
+            shutil.rmtree(self.temp_folder)
+            
         return
 
     # Helper methods
@@ -394,7 +400,7 @@ class B2Fuse(Operations):
 
         elif self.open_files.get(path) is None:
             file_info = self._directories.get_file_info(path)
-            self.open_files[path] = B2File(self, file_info)
+            self.open_files[path] = self.B2File(self, file_info)
 
         self.fd += 1
         return self.fd
@@ -415,7 +421,7 @@ class B2Fuse(Operations):
     def read(self, path, length, offset, fh):
         self.logger.debug("Read %s (len:%s offset:%s fh:%s)", path, length, offset, fh)
 
-        return self.open_files[self._remove_start_slash(path)].read(offset, length).tostring()
+        return self.open_files[self._remove_start_slash(path)].read(offset, length)
 
     def write(self, path, data, offset, fh):
         path = self._remove_start_slash(path)

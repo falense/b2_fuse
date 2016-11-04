@@ -125,7 +125,6 @@ encfs <bucket_mountpoint> <encrypted_filesystem>
 
 * Concurrent access from multiple client will lead to inconsistent results
 * Small files give low read/write performance (due to high latency)
-* Command line argument "use_disk" is non-functional
 
 
 
