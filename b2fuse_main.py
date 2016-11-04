@@ -413,7 +413,7 @@ class B2Fuse(Operations):
         file_info = {}
         file_info['fileName'] = path
 
-        self.open_files[path] = B2File(self, file_info, True)  #array.array('c')
+        self.open_files[path] = self.B2File(self, file_info, True)  #array.array('c')
 
         self.fd += 1
         return self.fd
