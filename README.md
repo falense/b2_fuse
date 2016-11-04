@@ -51,13 +51,45 @@ In order to use the FUSE driver as an interface to the online service B2 run:
 python b2fuse.py <mountpoint>
 ```
 
+Full usage info:
+
+
+```
+usage: b2fuse.py [-h] [--enable_hashfiles] [--use_disk]
+                 [--account_id ACCOUNT_ID] [--application_key APPLICATION_KEY]
+                 [--bucket_id BUCKET_ID] [--memory_limit MEMORY_LIMIT]
+                 [--temp_folder TEMP_FOLDER]
+                 [--config_filename CONFIG_FILENAME]
+                 mountpoint
+
+positional arguments:
+  mountpoint            Mountpoint for the B2 bucket
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --enable_hashfiles
+  --use_disk
+  --account_id ACCOUNT_ID
+                        Account ID for your B2 account (overrides config)
+  --application_key APPLICATION_KEY
+                        Application key for your account (overrides config)
+  --bucket_id BUCKET_ID
+                        Bucket ID for the bucket to mount (overrides config)
+  --memory_limit MEMORY_LIMIT
+                        Memory limit
+  --temp_folder TEMP_FOLDER
+                        Temporary file folder
+  --config_filename CONFIG_FILENAME
+                        Config file
+
+```
+
 Usage notes:
 
 * Can be used as a regular filesystem, but should not (high latency)
 * Files are cached in memory. If you write or read very large files this may cause issues (you are limited by available ram)
 * Neither permissions or timestamps are supported by B2. B2_fuse ignores any requests to set permissions.
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
-* Having many files in a bucket (multiples of 1000) will drastically increase the startup time/mount time. 
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
 
 ### Application specific notes:
@@ -93,6 +125,7 @@ encfs <bucket_mountpoint> <encrypted_filesystem>
 
 * Concurrent access from multiple client will lead to inconsistent results
 * Small files give low read/write performance (due to high latency)
+* Command line argument "use_disk" is non-functional
 
 
 
