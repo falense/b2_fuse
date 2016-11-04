@@ -389,7 +389,8 @@ class B2Fuse(Operations):
             raise FuseOSError(errno.EACCES)
 
         if path.endswith(".sha1"):
-            self.open_files[path] = B2HashFile(self, path)
+            file_info = self._directories.get_file_info(path[:-5])
+            self.open_files[path] = B2HashFile(self, file_info)
 
         elif self.open_files.get(path) is None:
             file_info = self._directories.get_file_info(path)

@@ -26,11 +26,13 @@
 import array
 
 
-class B2HashFile(object):
-    def __init__(self, b2fuse, path):
-        self.b2fuse = b2fuse
+from B2BaseFile import B2BaseFile
 
-        file_hash = self.b2fuse.bucket_api.get_file_info_detailed(path[:-5])['contentSha1'] + "\n"
+class B2HashFile(B2BaseFile):
+    def __init__(self, b2fuse, file_info, new_file=False):
+        super(B2HashFile, self).__init__(b2fuse, file_info)
+
+        file_hash = file_info['contentSha1'] + "\n"
         self.data = array.array('c', file_hash.encode("utf-8"))
 
     #def __getitem__(self, key):
