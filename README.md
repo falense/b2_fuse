@@ -1,9 +1,13 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.3 - Beta
+### Version: 1.3 
+
+#### This is fresh release based upon B2 Command line tool's API for B2. 
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 #### Please report bugs, use-case issues and feature requests through the Github issue tracker
+
+
 
 ### Basic setup:
 
