@@ -1,9 +1,13 @@
 # b2_fuse - FUSE for Backblaze B2
  
-### Version: 1.2.1
+### Version: 1.3 
+
+#### This is fresh release based upon B2 Command line tool's API for B2. 
 
 #### Warning this software may contain bugs, be careful of using it with important data.
 #### Please report bugs, use-case issues and feature requests through the Github issue tracker
+
+
 
 ### Basic setup:
 
@@ -22,6 +26,12 @@ sudo apt-get install python-pip
 sudo pip install fusepy
 ```
 
+Install B2 Comming Line Tool for python as follows: 
+
+```
+sudo pip install b2
+```
+
 On Python 2.7 use this instead:
 ```
 sudo python -m pip install fusepy
@@ -35,12 +45,43 @@ applicationKey: <yourapplicationid>
 bucketId: <yourbucketid>
 ```
 
-### Online only copy
-
-This FUSE driver can be used either with a (small) memory backing for current open files or a complete local copy. In order to use the FUSE driver as an interface to the online service B2 (with no local copy) use:
+In order to use the FUSE driver as an interface to the online service B2 run:
 
 ```
 python b2fuse.py <mountpoint>
+```
+
+Full usage info:
+
+
+```
+usage: b2fuse.py [-h] [--enable_hashfiles] [--use_disk]
+                 [--account_id ACCOUNT_ID] [--application_key APPLICATION_KEY]
+                 [--bucket_id BUCKET_ID] [--memory_limit MEMORY_LIMIT]
+                 [--temp_folder TEMP_FOLDER]
+                 [--config_filename CONFIG_FILENAME]
+                 mountpoint
+
+positional arguments:
+  mountpoint            Mountpoint for the B2 bucket
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --enable_hashfiles
+  --use_disk
+  --account_id ACCOUNT_ID
+                        Account ID for your B2 account (overrides config)
+  --application_key APPLICATION_KEY
+                        Application key for your account (overrides config)
+  --bucket_id BUCKET_ID
+                        Bucket ID for the bucket to mount (overrides config)
+  --memory_limit MEMORY_LIMIT
+                        Memory limit
+  --temp_folder TEMP_FOLDER
+                        Temporary file folder
+  --config_filename CONFIG_FILENAME
+                        Config file
+
 ```
 
 Usage notes:
@@ -49,22 +90,7 @@ Usage notes:
 * Files are cached in memory. If you write or read very large files this may cause issues (you are limited by available ram)
 * Neither permissions or timestamps are supported by B2. B2_fuse ignores any requests to set permissions.
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
-* Having many files in a bucket (multiples of 1000) will drastically increase the startup time/mount time. 
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
-
-### With local copy
-
-If you wish to try the local copy variant, this requires a folder to store the local replica in addition to the mountpoint you wish to use. 
-
-```
-python b2local.py <local_directory> <mountpoint>
-```
-
-Usage notes:
-
-* Threaded uploads and deletions, large files will cause problems as splitting uploads is not yet supported
-* Changes will only take effect online after 15+ seconds. This is a timeout in order to handle multiple successive closures and flushing of the same file. 
-* First synchronization will take a long time. Threading speeds up the process, but FUSE driver will not respond to filesystem requests before synchronization is complete.
 
 ### Application specific notes:
 
