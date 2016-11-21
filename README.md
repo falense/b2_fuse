@@ -19,22 +19,18 @@ Install YAML for python as follows:
 sudo apt-get install python-yaml
 ```
 
-Install FUSE for python as follows: 
+Install FUSE and B2 Comming Line Tool for python as follows: 
 
 ```
 sudo apt-get install python-pip
 sudo pip install fusepy
-```
-
-Install B2 Comming Line Tool for python as follows: 
-
-```
 sudo pip install b2
 ```
 
-On Python 2.7 use this instead:
+If the above does not work (a possibility on Python 2.7) use this instead:
 ```
 sudo python -m pip install fusepy
+sudo python -m pip install b2
 ```
 
 An example config ("config.yaml"):
@@ -57,8 +53,7 @@ Full usage info:
 ```
 usage: b2fuse.py [-h] [--enable_hashfiles] [--use_disk]
                  [--account_id ACCOUNT_ID] [--application_key APPLICATION_KEY]
-                 [--bucket_id BUCKET_ID] [--memory_limit MEMORY_LIMIT]
-                 [--temp_folder TEMP_FOLDER]
+                 [--bucket_id BUCKET_ID] [--temp_folder TEMP_FOLDER]
                  [--config_filename CONFIG_FILENAME]
                  mountpoint
 
@@ -75,8 +70,6 @@ optional arguments:
                         Application key for your account (overrides config)
   --bucket_id BUCKET_ID
                         Bucket ID for the bucket to mount (overrides config)
-  --memory_limit MEMORY_LIMIT
-                        Memory limit
   --temp_folder TEMP_FOLDER
                         Temporary file folder
   --config_filename CONFIG_FILENAME
@@ -87,7 +80,7 @@ optional arguments:
 Usage notes:
 
 * Can be used as a regular filesystem, but should not (high latency)
-* Files are cached in memory. If you write or read very large files this may cause issues (you are limited by available ram)
+* Files are cached in memory or on disk. If using memory you are limited by the available memory, swapping will occur for very large files.
 * Neither permissions or timestamps are supported by B2. B2_fuse ignores any requests to set permissions.
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
