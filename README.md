@@ -120,6 +120,30 @@ Install encfs (apt-get install encfs)
 encfs <bucket_mountpoint> <encrypted_filesystem>
 ```
 
+### Permanent mount points
+####Setup
+*put contents of b2_fuse-master in /etc/b2fuse
+*create the config.yaml mentioned in the github documenation in /etc/b2fuse
+*create /mnt/b2fuse-mount & make it owned by the admin account this is being done under and then add it to the group www-data
+*chown 775 b2fuse-mount 
+
+####Start as a Service
+*Ubuntu with upstart
+- create /etc/init/b2fuse.conf (this will allow the b2fuse mount to start when the system starts...)
+- In b2fuse.conf put the following lines
+```
+start on filesystem
+exec python /etc/b2fuse/b2fuse.py /mnt/b2fuse-mount
+```
+*Ubuntu without upstart
+There are many options listed here: http://stackoverflow.com/questions/24518522/run-python-script-at-startup-in-ubuntu
+
+*Red Hat/CentOS
+Follow the instructions and make sure 
+http://www.abhigupta.com/2010/06/how-to-auto-start-services-on-boot-in-centos-redhat/
+
+*Any other Linux versions that don't work like the above make sure to find instructions and follow them to start the python script
+NOTE: Mounting the fuse drive as root may cause problems (which may occur if attempting to use roots crontab).
 
 ### Known issues:
 
