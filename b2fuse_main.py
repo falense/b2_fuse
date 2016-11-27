@@ -63,7 +63,9 @@ class B2Fuse(Operations):
 
         if self.use_disk:
             if os.path.exists(self.temp_folder):
-                shutil.rmtree(self.temp_folder)
+                self.logger.error("Temporary folder exists, exiting")
+                exit(1)
+                
             os.makedirs(self.temp_folder)
             self.B2File = B2FileDisk
         else:
