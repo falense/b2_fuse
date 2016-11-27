@@ -38,6 +38,8 @@ def create_parser():
 
     parser.add_argument('--enable_hashfiles', dest='enable_hashfiles', action='store_true')
     parser.set_defaults(enable_hashfiles=False)
+    
+    parser.add_argument('--version',action='version', version="B2Fuse version 1.3")
 
     parser.add_argument('--use_disk', dest='use_disk', action='store_true')
     parser.set_defaults(use_disk=False)
