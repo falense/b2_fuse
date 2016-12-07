@@ -19,7 +19,7 @@ Install YAML for python as follows:
 sudo apt-get install python-yaml
 ```
 
-Install FUSE and B2 Comming Line Tool for python as follows: 
+Install FUSE and B2 Command Line Tool for python as follows: 
 
 ```
 sudo apt-get install python-pip
@@ -113,6 +113,35 @@ Install encfs (apt-get install encfs)
 encfs <bucket_mountpoint> <encrypted_filesystem>
 ```
 
+### Permanent mount points
+#### Setup
+1. put contents of b2_fuse-master in /etc/b2fuse
+2. create the config.yaml mentioned in the github documenation in /etc/b2fuse
+3. create /mnt/b2fuse-mount & make it owned by the admin account this is being done under and then add it to the group www-data
+4. chown 775 b2fuse-mount 
+
+#### Start as a Service
+NOTE: Below are a few ways this can be done. 
+The guide below is only complete when utilizing upstart in Ubuntu, though links for reference to other methods are included.
+
+##### Ubuntu with upstart
+This has been seen to work in Ubuntu 14.04 LTS as well as 16.04 LTS
+* create /etc/init/b2fuse.conf (this will allow the b2fuse mount to start when the system starts...)
+* In b2fuse.conf put the following lines
+```
+start on filesystem
+exec python /etc/b2fuse/b2fuse.py /mnt/b2fuse-mount
+```
+##### Ubuntu without upstart
+* There are many options listed here: http://stackoverflow.com/questions/24518522/run-python-script-at-startup-in-ubuntu
+
+##### Red Hat/CentOS
+* Follow the instructions and make sure the options you choose make the command run when the OS starts
+* http://www.abhigupta.com/2010/06/how-to-auto-start-services-on-boot-in-centos-redhat/
+
+##### Any other Linux versions that don't work like the above 
+* Make sure to find instructions and follow them to start the python script when the OS starts under an appropriate run level.
+NOTE: Mounting the fuse drive as root may cause problems (which is a problem that may occur if attempting to use roots crontab).
 
 ### Known issues:
 
