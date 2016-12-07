@@ -19,7 +19,7 @@ Install YAML for python as follows:
 sudo apt-get install python-yaml
 ```
 
-Install FUSE and B2 Comming Line Tool for python as follows: 
+Install FUSE and B2 Command Line Tool for python as follows: 
 
 ```
 sudo apt-get install python-pip
