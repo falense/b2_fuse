@@ -36,7 +36,7 @@ def create_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("mountpoint", type=str, help="Mountpoint for the B2 bucket")
 
-    parser.add_argument('--enable_hashfiles', dest='enable_hashfiles', action='store_true')
+    parser.add_argument('--enable_hashfiles', dest='enable_hashfiles', action='store_true', help="Enable normally hidden hashes as exposed by B2 API")
     parser.set_defaults(enable_hashfiles=False)
     
     parser.add_argument('--version',action='version', version="B2Fuse version 1.3")
@@ -63,7 +63,6 @@ def create_parser():
         help="Bucket ID for the bucket to mount (overrides config)"
     )
 
-    parser.add_argument("--memory_limit", type=int, default=128, help="Memory limit")
     parser.add_argument("--temp_folder", type=str, default=".tmp/", help="Temporary file folder")
     parser.add_argument("--config_filename", type=str, default="config.yaml", help="Config file")
 
@@ -100,9 +99,6 @@ if __name__ == '__main__':
     else:
         config["enableHashfiles"] = False
 
-    if args.memory_limit:
-        config["memoryLimit"] = args.memory_limit
-
     if args.temp_folder:
         config["tempFolder"] = args.temp_folder
 
@@ -113,6 +109,6 @@ if __name__ == '__main__':
 
     with B2Fuse(
         config["accountId"], config["applicationKey"], config["bucketId"],
-        config["enableHashfiles"], config["memoryLimit"], config["tempFolder"], config["useDisk"]
+        config["enableHashfiles"], config["tempFolder"], config["useDisk"]
     ) as filesystem:
         FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)

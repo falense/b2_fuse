@@ -51,7 +51,7 @@ Full usage info:
 
 
 ```
-usage: b2fuse.py [-h] [--enable_hashfiles] [--use_disk]
+usage: b2fuse.py [-h] [--enable_hashfiles] [--version] [--use_disk]
                  [--account_id ACCOUNT_ID] [--application_key APPLICATION_KEY]
                  [--bucket_id BUCKET_ID] [--temp_folder TEMP_FOLDER]
                  [--config_filename CONFIG_FILENAME]
@@ -62,7 +62,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --enable_hashfiles
+  --enable_hashfiles    Enable normally hidden hashes as exposed by B2 API
+  --version             show program's version number and exit
   --use_disk
   --account_id ACCOUNT_ID
                         Account ID for your B2 account (overrides config)
@@ -74,7 +75,6 @@ optional arguments:
                         Temporary file folder
   --config_filename CONFIG_FILENAME
                         Config file
-
 ```
 
 Usage notes:

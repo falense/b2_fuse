@@ -46,7 +46,7 @@ from cached_bucket import CachedBucket
 
 class B2Fuse(Operations):
     def __init__(
-        self, account_id, application_key, bucket_id, enable_hashfiles, memory_limit, temp_folder,
+        self, account_id, application_key, bucket_id, enable_hashfiles, temp_folder,
         use_disk
     ):
         account_info = InMemoryAccountInfo()
@@ -57,7 +57,6 @@ class B2Fuse(Operations):
         self.logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
         self.enable_hashfiles = enable_hashfiles
-        self.memory_limit = memory_limit
         self.temp_folder = temp_folder
         self.use_disk = use_disk
 
