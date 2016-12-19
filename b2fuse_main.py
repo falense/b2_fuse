@@ -190,11 +190,13 @@ class B2Fuse(Operations):
             if path in online_files:
                 #print "File is in bucket"
                 file_info = self._directories.get_file_info(path)
+                
+                seconds_since_jan1_1970 = int(file_info['uploadTimestamp']/1000.)
                 return dict(
                     st_mode=(S_IFREG | 0777),
-                    st_ctime=file_info['uploadTimestamp'],
-                    st_mtime=file_info['uploadTimestamp'],
-                    st_atime=file_info['uploadTimestamp'],
+                    st_ctime=seconds_since_jan1_1970,
+                    st_mtime=seconds_since_jan1_1970,
+                    st_atime=seconds_since_jan1_1970,
                     st_nlink=1,
                     st_size=file_info['size']
                 )
