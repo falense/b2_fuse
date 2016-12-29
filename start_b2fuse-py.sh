@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Version of this script
-script_version="1.0"
+script_version="1.1"
+
 echo
 echo "     Bash script to invoke b2fuse.py"
 echo "           The vesion of this script is "$script_version""
@@ -203,17 +204,12 @@ else
 fi
 
 echo
-echo "additional parameters that will be added:   "$additional_parameters""
+echo "additional parameters that will be added:   \""$additional_parameters"\""
 echo
 
 # Run the program
-command_line="/usr/bin/python2.7 "$script_dir"/b2fuse.py --config_filename "$config_name" $additional_parameters "$mount_point""
-echo "command line:  python "$script_dir"/b2fuse.py --config_filename "$config_name" "$additional_parameters" "$mount_point""
-echo "$command_line"
 exec python "$script_dir"/b2fuse.py --config_filename "$config_name" $3 $4 $5 $additional_parameters "$mount_point" &
-# exec $command_line
 
-echo "error: "$?""
 if [[ $? = 0 ]]
 then
 	echo
