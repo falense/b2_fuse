@@ -1,0 +1,19 @@
+The script can not be renamed unless the "name_of_this_script_must_be" variable be changed accordingly.
+
+The script can be symlinked to another place, for example somewhere in the $PATH with another convenient name.
+
+The configuration file mus be named "config_<bucket_name>_bucket.yaml".
+
+Tha configuration file may optionally have a line with the format: "mount_point: <path_to_mount_point>" with no spaces on it.
+
+If the mount point line doesn't exist in the configuration file the script will ask to write the mount point or it can be specified in the command line. If the mount mount point is specified in the command line it will override the mount point in the configuration file if such line exists.
+
+The script can be run in a fully non interactive way with this command:
+
+echo "n" | start_b2fuse-py.sh <bucket_name> <mount_point> [--enable_hashfiles] [--use_disk] ["--temp_folder <path_to_temp_folder>"]
+
+Instead of "start_b2fuse-py.sh" we can invoke any symlink that points to it. If the symlink is in the $PATH it is not necessary to especify its full path. The symlink to the script can have whatever name we choose.
+
+The "start_b2fuse-py.sh" script must always stay in the installation folder. Use symlinks to access it from other places.
+
+The last three parameters are optional and ["--temp_folder <path_to_temp_folder>"] must be inside quotation marks.
