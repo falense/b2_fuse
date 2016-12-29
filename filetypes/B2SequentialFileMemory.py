@@ -68,6 +68,9 @@ class B2SequentialFileMemory(B2BaseFile):
     def write(self, offset, data):
         if offset == len(self):
             self.data.extend(data)
+        elif offset+len(data) < len(self):
+            for i in range(len(data)):
+                self.data[offset+i] = data[i]
         else:
             raise NotImplemented()
 

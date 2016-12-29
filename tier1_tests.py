@@ -72,6 +72,43 @@ class TestCreateAndWrite(unittest.TestCase):
             
         self.assertEqual(data, read_data, "Written data was not the same as read data")
         
+class TestCreateAndRandomWrite(unittest.TestCase):
+    def setUp(self):
+        self._mountpoint = "mountpoint"
+        
+        self._file_path = os.path.join(self._mountpoint, "dummy_file_createandrandomwrite")
+        
+    def tearDown(self):
+        os.remove(self._file_path)
+
+    def test_create_file(self):
+        data = "Hello world"
+        
+        offset = 2
+        mask = "ee"
+        
+        read_data_orig = data[:offset] + mask + data[offset+len(mask):]
+        
+        f = open(self._file_path, "w")
+        f.write(data)
+        f.close()
+        
+        if os.path.exists(self._file_path):
+            f = open(self._file_path, "r+")
+            f.seek(offset, 0)
+            f.write(mask)
+            f.close()
+            
+        
+        if os.path.exists(self._file_path):
+            f = open(self._file_path, "r")
+            read_data = f.read()
+            f.close()
+            
+        print data, read_data, read_data_orig
+            
+        self.assertEqual(read_data_orig, read_data, "Written data was not the same as read data")
+        
 class TestCreateWriteCopy(unittest.TestCase):
     def setUp(self):
         self._mountpoint = "mountpoint"
