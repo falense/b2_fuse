@@ -147,7 +147,7 @@ NOTE: Mounting the fuse drive as root may cause problems (which is a problem tha
 
 * Concurrent access from multiple client will lead to inconsistent results
 * Small files give low read/write performance (due to high latency)
-
+* Some text editors may return odd characters when viewing the ".sha1" files. Use cat for reliable operation.
 
 
 License: MIT license
