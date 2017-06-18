@@ -128,7 +128,7 @@ class B2Fuse(Operations):
 
     def _update_directory_structure(self):
         #Update the directory structure with online files and local directories
-        online_files = self.bucket_api.list_file_names()['files']
+        online_files = [l[0].as_dict() for l in self.bucket_api.ls()]#self.bucket_api.list_file_names()['files']
         self._directories.update_structure(online_files, self.local_directories)
 
     def _remove_local_file(self, path, delete_online=True):
@@ -138,6 +138,9 @@ class B2Fuse(Operations):
         elif delete_online:
             file_info = self._directories.get_file_info(path)
             self.bucket_api.delete_file_version(file_info['fileId'], file_info['fileName'])
+#{'size': 19, 'action': u'upload', 'uploadTimestamp': 1477072704000, 'fileName': u'.goutputstream-J5ZNPY', 'fileId': u'4_z4a4089f903fbc1d150640114_f104e0f44e7832f51_d20161021_m175824_c001_v0001033_t0031'}
+
+#{u'contentType': u'application/octet-stream', u'contentSha1': u'a67ce81bd43149c12151e0a6cf1f40bc8571dfd7', u'contentLength': 19, u'fileName': u'.goutputstream-J5ZNPY', u'action': u'upload', u'fileInfo': {}, u'size': 19, u'uploadTimestamp': 1477072704000, u'fileId': u'4_z4a4089f903fbc1d150640114_f104e0f44e7832f51_d20161021_m175824_c001_v0001033_t0031'}
 
     def _remove_start_slash(self, path):
         if path.startswith("/"):
@@ -186,7 +189,8 @@ class B2Fuse(Operations):
         elif self._exists(path):
             #If file exist return attributes
 
-            online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+            online_files = [l[0].file_name for l in self.bucket_api.ls()]
+            
             if path in online_files:
                 #print "File is in bucket"
                 file_info = self._directories.get_file_info(path)
@@ -296,7 +300,7 @@ class B2Fuse(Operations):
             return False
 
         #Add files found in bucket
-        online_files = [file['fileName'] for file in self.bucket_api.list_file_names()['files']]
+        online_files = [l[0].file_name for l in self.bucket_api.ls()]
         dirents = filter(in_folder, online_files)
 
         #Add files kept in local memory
@@ -316,9 +320,8 @@ class B2Fuse(Operations):
             dirents.append(filename)
 
         for filename in dirents:
-            online_files = [
-                (f['fileName'], f['fileId']) for f in self.bucket_api.list_file_names()['files']
-            ]
+            online_files = [(l[0].file_name, l[0].id_) for l in self.bucket_api.ls()]
+            
             fileName_to_fileId = dict(online_files)
             self.api.delete_file_version(fileName_to_fileId[path], path)
 

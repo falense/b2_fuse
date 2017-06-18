@@ -77,13 +77,13 @@ class CachedBucket(Bucket):
 
         raise CacheNotFound()
 
-    def list_file_names(self):
-        func_name = "list_file_names"
+    def ls(self):
+        func_name = "ls"
 
         try:
             return self._get_cache(func_name)
         except CacheNotFound:
-            result = super(CachedBucket, self).list_file_names()
+            result = [f for f in super(CachedBucket, self).ls()]
             return self._update_cache(func_name, result)
 
     def delete_file_version(self, *args, **kwargs):
