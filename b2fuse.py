@@ -66,6 +66,9 @@ def create_parser():
     parser.add_argument("--temp_folder", type=str, default=".tmp/", help="Temporary file folder")
     parser.add_argument("--config_filename", type=str, default="config.yaml", help="Config file")
 
+    parser.add_argument('--allow_other', dest='allow_other', action='store_true')
+    parser.set_defaults(allow_other=False)
+
     return parser
 
 
@@ -107,8 +110,13 @@ if __name__ == '__main__':
     else:
         config["useDisk"] = False
 
+    args.options = {} # additional options passed to FUSE
+
+    if args.allow_other:
+        args.options['allow_other'] = True
+
     with B2Fuse(
         config["accountId"], config["applicationKey"], config["bucketId"],
         config["enableHashfiles"], config["tempFolder"], config["useDisk"]
     ) as filesystem:
-        FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
+        FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True, **args.options)
