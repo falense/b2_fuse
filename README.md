@@ -28,6 +28,7 @@ sudo pip install b2
 ```
 
 If the above does not work (a possibility on Python 2.7) use this instead:
+
 ```
 sudo python -m pip install fusepy
 sudo python -m pip install b2
@@ -87,7 +88,7 @@ Usage notes:
 
 ### Application specific notes:
 
-####Using RSync with B2 Fuse
+#### Using RSync with B2 Fuse
 
 Since there is no support for updating file times or permissions in a bucket, rsync must be told to ignore both when synching folders (sync will be based on checksum meaning files have to be downloaded to compare).
 
@@ -97,7 +98,7 @@ rsync -avzh --no-perms --no-owner --no-group dir1/ dir2/
 
 Option "--inplace" may also be useful. RSync creates a temporary file when syncing, this option will make RSync update the file inplace instead (Effectively twice as fast syncing).
 
-####Using unison to synchronize against mounted folder
+#### Using unison to synchronize against mounted folder
 
 Again, we ignore permissions as these are not applicable.
 
@@ -113,7 +114,7 @@ Install encfs (apt-get install encfs)
 encfs <bucket_mountpoint> <encrypted_filesystem>
 ```
 
-####Instruction for permanent mounting of B2Fuse can be found [here](../master/permanent_mount.md)
+#### Instruction for permanent mounting of B2Fuse can be found [here](../master/permanent_mount.md)
 
 ### Known issues:
 
