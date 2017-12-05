@@ -13,21 +13,20 @@
 
 Requires YAML and FUSE for python to work (this is not the same as "python-fuse" package). 
 
-Install YAML for python as follows: 
+Install dependencies for python as follows: 
 
 ```
-sudo apt-get install python-yaml
+sudo apt-get install python3-yaml python3-pip python3-setuptools python3-wheel
 ```
 
 Install FUSE and B2 Command Line Tool for python as follows: 
 
 ```
-sudo apt-get install python-pip
-sudo pip install fusepy
-sudo pip install b2
+sudo pip3 install fusepy
+sudo pip3 install b2
 ```
 
-If the above does not work (a possibility on Python 2.7) use this instead:
+If the above does not work (if you are limited to Python 2.7) use this instead:
 ```
 sudo python -m pip install fusepy
 sudo python -m pip install b2
