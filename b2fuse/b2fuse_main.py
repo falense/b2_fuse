@@ -184,7 +184,7 @@ class B2Fuse(Operations):
                 st_atime=time(),
                 st_nlink=2
             )
-
+            
         #Check if path is a file
         elif self._exists(path):
             #If file exist return attributes
@@ -291,7 +291,7 @@ class B2Fuse(Operations):
         path = self._remove_start_slash(path)
 
         def in_folder(filename):
-            if filename.startswith(path):
+            if filename.startswith(path) and filename[len(path):len(path)+1] == "/":
                 relative_filename = self._remove_start_slash(filename[len(path):])
 
                 if "/" not in relative_filename:
