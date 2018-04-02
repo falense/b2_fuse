@@ -80,8 +80,7 @@ def load_config(config_filename):
     with open(config_filename) as f:
         return yaml.load(f.read())
 
-
-if __name__ == '__main__':
+def main():
     parser = create_parser()
     args = parser.parse_args()
     
@@ -127,3 +126,7 @@ if __name__ == '__main__':
         config["enableHashfiles"], config["tempFolder"], config["useDisk"]
     ) as filesystem:
         FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True, **args.options)
+
+
+if __name__ == '__main__':
+    main()
