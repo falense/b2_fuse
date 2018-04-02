@@ -43,6 +43,10 @@ def create_parser():
 
     parser.add_argument('--use_disk', dest='use_disk', action='store_true')
     parser.set_defaults(use_disk=False)
+    
+    
+    parser.add_argument('--debug', dest='debug', action='store_true')
+    parser.set_defaults(debug=False)
 
     parser.add_argument(
         "--account_id",
@@ -78,10 +82,13 @@ def load_config(config_filename):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.WARNING, format="%(asctime)s:%(levelname)s:%(message)s")
-
     parser = create_parser()
     args = parser.parse_args()
+    
+    if args.debug:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s:%(levelname)s:%(message)s")
+    else:
+        logging.basicConfig(level=logging.WARNING, format="%(asctime)s:%(levelname)s:%(message)s")
 
     if args.config_filename:
         config = load_config(args.config_filename)
