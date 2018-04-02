@@ -184,7 +184,7 @@ class B2Fuse(Operations):
                 st_atime=time(),
                 st_nlink=2
             )
-
+            
         #Check if path is a file
         elif self._exists(path):
             #If file exist return attributes
