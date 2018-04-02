@@ -77,7 +77,7 @@ def load_config(config_filename):
         return yaml.load(f.read())
 
 
-if __name__ == '__main__':
+def main():
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s:%(levelname)s:%(message)s")
 
     parser = create_parser()
@@ -120,3 +120,7 @@ if __name__ == '__main__':
         config["enableHashfiles"], config["tempFolder"], config["useDisk"]
     ) as filesystem:
         FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True, **args.options)
+
+
+if __name__ == '__main__':
+    main()
