@@ -14,13 +14,10 @@ setup(
     classifiers=[
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
     ],
     keywords='',
     author='Sondre Engebraaten',
-    author_email='info@sennder.com',
+    author_email='info@sender.com',
     packages=find_packages(),
     install_requires=[
         'b2==1.1.0',
