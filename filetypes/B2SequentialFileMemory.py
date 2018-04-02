@@ -72,7 +72,9 @@ class B2SequentialFileMemory(B2BaseFile):
             for i in range(len(data)):
                 self.data[offset+i] = data[i]
         else:
-            raise NotImplemented()
+			extend_length = offset-len(data)
+			self.data.extend([0 for i in range(extend_length)])
+			self.write(offset, data)
 
     def read(self, offset, length):
         return self.data[offset:offset + length].tostring()
