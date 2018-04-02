@@ -53,7 +53,7 @@ class B2FileDisk(B2BaseFile):
         else:
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
-            self.temp_file.write(download_dest.bytes_io.getvalue())
+            self.temp_file.write(download_dest.get_bytes_written())
             
         
     def __len__(self):
