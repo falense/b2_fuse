@@ -135,7 +135,6 @@ class DirectoryStructure(object):
     def get_file_info(self, path):
         path_split = path.split("/")
 
-        filename = path_split[-1]
         file_path = path_split[:-1]
 
         directory = self._lookup(self._directories, file_path)

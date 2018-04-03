@@ -23,7 +23,6 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-import array
 import os
 import os.path
 
@@ -31,31 +30,31 @@ from b2.download_dest import DownloadDestBytes
 
 from B2BaseFile import B2BaseFile
 
+
 class B2FileDisk(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):
         super(B2FileDisk, self).__init__(b2fuse, file_info)
-        
+
         self.temp_filename = os.path.join(self.b2fuse.temp_folder, self.file_info['fileName'])
-        
+
         folder = os.path.join(self.b2fuse.temp_folder, os.path.dirname(self.file_info['fileName']))
         if not os.path.exists(folder):
             os.makedirs(folder)
 
         self._dirty = False
-        
+
         if os.path.exists(self.temp_filename):
             os.remove(self.temp_filename)
-        
+
         self.temp_file = open(self.temp_filename, "wr+b")
-    
+
         if new_file:
             self._dirty = True
         else:
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
             self.temp_file.write(download_dest.get_bytes_written())
-            
-        
+
     def __len__(self):
         return os.path.getsize(self.temp_filename)
 
@@ -69,10 +68,10 @@ class B2FileDisk(B2BaseFile):
 
     #def __del__(self):
     #    self.delete()
-        
+
     def upload(self):
         if self._dirty:
-            data = self.read(0,len(self))
+            data = self.read(0, len(self))
             self.b2fuse.bucket_api.upload_bytes(bytes(data), self.file_info['fileName'])
             self.b2fuse._update_directory_structure()
             self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
@@ -94,4 +93,3 @@ class B2FileDisk(B2BaseFile):
 
     def set_dirty(self, new_value):
         self._dirty = new_value
-
