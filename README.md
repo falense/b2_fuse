@@ -19,21 +19,27 @@ Install YAML for python as follows:
 sudo apt-get install python-yaml
 ```
 
-Install FUSE and B2 Command Line Tool for python as follows: 
+Install via pip:
 
 ```
-sudo apt-get install python-pip
-sudo pip install fusepy
-sudo pip install b2
+sudo pip install b2fuse
 ```
 
-If the above does not work (a possibility on Python 2.7) use this instead:
+Or install from code in development mode by executing in the base directory of this repository:
+
+```
+sudo python setup.py develop
+```
+
+If the above does not work (a possibility on Python 2.7), you can also install FUSE and the B2 Command Line Tool dependencies as follows:
+
 
 ```
 sudo python -m pip install fusepy
 sudo python -m pip install b2
 ```
 
+You will need a `config.yaml` file in the folder where you run the fuse driver.
 An example config ("config.yaml"):
 
 ```
@@ -45,18 +51,18 @@ bucketId: <yourbucketid>
 In order to use the FUSE driver as an interface to the online service B2 run:
 
 ```
-python b2fuse.py <mountpoint>
+b2fuse <mountpoint>
 ```
 
 Full usage info:
 
 
 ```
-usage: b2fuse.py [-h] [--enable_hashfiles] [--version] [--use_disk]
-                 [--account_id ACCOUNT_ID] [--application_key APPLICATION_KEY]
-                 [--bucket_id BUCKET_ID] [--temp_folder TEMP_FOLDER]
-                 [--config_filename CONFIG_FILENAME]
-                 mountpoint
+usage: b2fuse [-h] [--enable_hashfiles] [--version] [--use_disk] [--debug]
+              [--account_id ACCOUNT_ID] [--application_key APPLICATION_KEY]
+              [--bucket_id BUCKET_ID] [--temp_folder TEMP_FOLDER]
+              [--config_filename CONFIG_FILENAME] [--allow_other]
+              mountpoint
 
 positional arguments:
   mountpoint            Mountpoint for the B2 bucket

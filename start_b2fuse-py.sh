@@ -208,7 +208,7 @@ echo "additional parameters that will be added:   \""$additional_parameters"\""
 echo
 
 # Run the program
-exec python "$script_dir"/b2fuse.py --config_filename "$config_name" $3 $4 $5 $additional_parameters "$mount_point" &
+exec python "$script_dir"/b2fuse/b2fuse.py --config_filename "$config_name" $3 $4 $5 $additional_parameters "$mount_point" &
 
 if [[ $? = 0 ]]
 then
