@@ -178,7 +178,7 @@ class B2Fuse(Operations):
         #Check if path is a directory
         if self._directories.is_directory(path):
             return dict(
-                st_mode=(S_IFDIR | 0777),
+                st_mode=(S_IFDIR | 0o777),
                 st_ctime=time(),
                 st_mtime=time(),
                 st_atime=time(),
@@ -197,7 +197,7 @@ class B2Fuse(Operations):
                 
                 seconds_since_jan1_1970 = int(file_info['uploadTimestamp']/1000.)
                 return dict(
-                    st_mode=(S_IFREG | 0777),
+                    st_mode=(S_IFREG | 0o777),
                     st_ctime=seconds_since_jan1_1970,
                     st_mtime=seconds_since_jan1_1970,
                     st_atime=seconds_since_jan1_1970,
@@ -208,7 +208,7 @@ class B2Fuse(Operations):
             elif path.endswith(".sha1"):
                 #print "File is just a hash"
                 return dict(
-                    st_mode=(S_IFREG | 0444),
+                    st_mode=(S_IFREG | 0o444),
                     st_ctime=0,
                     st_mtime=0,
                     st_atime=0,
@@ -219,7 +219,7 @@ class B2Fuse(Operations):
             else:
                 #print "File exists only locally"
                 return dict(
-                    st_mode=(S_IFREG | 0777),
+                    st_mode=(S_IFREG | 0o777),
                     st_ctime=0,
                     st_mtime=0,
                     st_atime=0,

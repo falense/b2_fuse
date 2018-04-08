@@ -28,7 +28,7 @@ import os.path
 
 from b2.download_dest import DownloadDestBytes
 
-from B2BaseFile import B2BaseFile
+from .B2BaseFile import B2BaseFile
 
 
 class B2FileDisk(B2BaseFile):

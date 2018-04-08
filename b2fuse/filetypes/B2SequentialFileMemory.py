@@ -27,7 +27,7 @@ import array
 
 from b2.download_dest import DownloadDestBytes
 
-from B2BaseFile import B2BaseFile
+from .B2BaseFile import B2BaseFile
 
 
 class B2SequentialFileMemory(B2BaseFile):
@@ -72,9 +72,9 @@ class B2SequentialFileMemory(B2BaseFile):
             for i in range(len(data)):
                 self.data[offset+i] = data[i]
         else:
-			extend_length = offset-len(data)
-			self.data.extend([0 for i in range(extend_length)])
-			self.write(offset, data)
+            extend_length = offset-len(data)
+            self.data.extend([0 for i in range(extend_length)])
+            self.write(offset, data)
 
     def read(self, offset, length):
         return self.data[offset:offset + length].tostring()

@@ -26,7 +26,7 @@
 import array
 
 
-from B2BaseFile import B2BaseFile
+from .B2BaseFile import B2BaseFile
 
 class B2HashFile(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):
