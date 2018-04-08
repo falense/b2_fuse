@@ -33,7 +33,7 @@ class B2HashFile(B2BaseFile):
         super(B2HashFile, self).__init__(b2fuse, file_info)
 
         file_hash = file_info['contentSha1'] + "\n"
-        self.data = array.array('c', file_hash.encode("utf-8"))
+        self.data = array.array('B', file_hash.encode("utf-8"))
 
     #def __getitem__(self, key):
     #    if isinstance(key, slice):
