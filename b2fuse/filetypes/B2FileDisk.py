@@ -46,7 +46,7 @@ class B2FileDisk(B2BaseFile):
         if os.path.exists(self.temp_filename):
             os.remove(self.temp_filename)
 
-        self.temp_file = open(self.temp_filename, "wr+b")
+        self.temp_file = open(self.temp_filename, "w+b")
 
         if new_file:
             self._dirty = True

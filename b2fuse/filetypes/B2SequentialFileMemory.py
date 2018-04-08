@@ -36,12 +36,12 @@ class B2SequentialFileMemory(B2BaseFile):
         
         self._dirty = False
         if new_file:
-            self.data = array.array('c')
+            self.data = array.array('B')
             self._dirty = True
         else:
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
-            self.data = array.array('c', download_dest.get_bytes_written())
+            self.data = array.array('B', download_dest.get_bytes_written())
 
     # def __getitem__(self, key):
     #    if isinstance(key, slice):
