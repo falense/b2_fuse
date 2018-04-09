@@ -26,7 +26,6 @@
 
 from b2.download_dest import DownloadDestBytes
 
-from ..py2_compat import byte_array
 from .B2BaseFile import B2BaseFile
 
 
@@ -36,12 +35,12 @@ class B2SequentialFileMemory(B2BaseFile):
         
         self._dirty = False
         if new_file:
-            self.data = byte_array()
+            self.data = bytearray()
             self._dirty = True
         else:
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
-            self.data = byte_array(download_dest.get_bytes_written())
+            self.data = bytearray(download_dest.get_bytes_written())
 
     # def __getitem__(self, key):
     #    if isinstance(key, slice):
@@ -50,7 +49,7 @@ class B2SequentialFileMemory(B2BaseFile):
 
     def upload(self):
         if self._dirty:
-            self.b2fuse.bucket_api.upload_bytes(bytes(self.data.tostring()), self.file_info['fileName'])
+            self.b2fuse.bucket_api.upload_bytes(bytes(self.data), self.file_info['fileName'])
             self.b2fuse._update_directory_structure()
             self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
 
@@ -77,11 +76,10 @@ class B2SequentialFileMemory(B2BaseFile):
             self.write(offset, data)
 
     def read(self, offset, length):
-        return byte_array(self.data[offset:offset + length]).tostring()
+        return bytes(self.data[offset:offset + length])
 
     def truncate(self, length):
-        # Convert back to python2-compatible data type after slicing
-        self.data = byte_array(self.data[:length])
+        self.data = self.data[:length]
 
     def set_dirty(self, new_value):
         self._dirty = new_value

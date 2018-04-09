@@ -25,7 +25,6 @@
 
 import logging
 
-from ..py2_compat import byte_array
 from B2BaseFile import B2BaseFile
 
 
@@ -41,7 +40,7 @@ class B2SparseFileMemory(B2BaseFile):
         self.part_size = 1024**2
         self.upload_part_size = 100 * 1024**2
         if new_file:
-            self.data = [byte_array()]
+            self.data = [bytearray()]
             self._dirty = True
 
             self.file_parts = [True]
@@ -77,7 +76,7 @@ class B2SparseFileMemory(B2BaseFile):
                 self.data[part_index].extend(data[:available_bytes])
 
                 leftover_data = data[available_bytes:]
-                self.data.append(byte_array(leftover_data))
+                self.data.append(bytearray(leftover_data))
                 self.file_parts.append(True)
 
                 self.size += length
@@ -110,7 +109,7 @@ class B2SparseFileMemory(B2BaseFile):
                     self.logger.warning("Prefetching %s %s" % (start_part, end_part))
 
                     def callback(byte_range, data):
-                        self.data[part] = byte_array(data)
+                        self.data[part] = bytearray(data)
                         self.ready_parts[part] = True
 
                     self.b2fuse.bucket.get_file_callback(
@@ -118,7 +117,7 @@ class B2SparseFileMemory(B2BaseFile):
                     )
                 else:
                     data = self.b2fuse.bucket.get_file(self.path, byte_range=(i_start, i_end))
-                    self.data[part] = byte_array(data)
+                    self.data[part] = bytearray(data)
                     self.ready_parts[part] = True
 
             while not prefetch and not self.ready_parts[part]:
@@ -144,7 +143,7 @@ class B2SparseFileMemory(B2BaseFile):
 
         temp_length = min(length, self.part_size)
         temp_data = self.data[start_part][chunk_start_index:chunk_start_index + temp_length]
-        chunk = byte_array(temp_data)
+        chunk = bytearray(temp_data)
 
         if length > (self.part_size - chunk_start_index):
             for part in range(start_part + 1, end_part, 1):
@@ -158,7 +157,7 @@ class B2SparseFileMemory(B2BaseFile):
 
     def truncate(self, length):
         if length == 0:
-            self.data = [byte_array()]
+            self.data = [bytearray()]
             self._dirty = True
 
             self.file_parts = [True]
