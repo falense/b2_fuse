@@ -50,4 +50,4 @@ class B2HashFile(B2BaseFile):
         return
 
     def read(self, offset, length):
-        return self.data.tostring()
+        return bytes(self.data)
