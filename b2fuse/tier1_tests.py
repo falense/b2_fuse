@@ -106,7 +106,7 @@ class TestCreateAndRandomWrite(unittest.TestCase):
             read_data = f.read()
             f.close()
 
-        print data, read_data, read_data_orig
+        print(data, read_data, read_data_orig)
 
         self.assertEqual(read_data_orig, read_data, "Written data was not the same as read data")
 

@@ -273,7 +273,7 @@ class B2Fuse(Operations):
 
         #If filenames has a prefix (relative to path) remove this
         if len(path) > 0:
-            dirents = map(lambda f: f[len(path) + 1:], dirents)
+            dirents = list(map(lambda f: f[len(path) + 1:], dirents))
 
         #Add hash files
         if self.enable_hashfiles:
