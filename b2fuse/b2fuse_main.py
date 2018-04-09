@@ -36,11 +36,11 @@ from time import time
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
 
-from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
-from filetypes.B2FileDisk import B2FileDisk
-from filetypes.B2HashFile import B2HashFile
-from directory_structure import DirectoryStructure
-from cached_bucket import CachedBucket
+from .filetypes.B2SequentialFileMemory import B2SequentialFileMemory
+from .filetypes.B2FileDisk import B2FileDisk
+from .filetypes.B2HashFile import B2HashFile
+from .directory_structure import DirectoryStructure
+from .cached_bucket import CachedBucket
 
 
 
@@ -122,7 +122,7 @@ class B2Fuse(Operations):
             directories.extend(directory.get_directories())
 
             for file_info in directory.get_file_infos():
-                space_consumption += file_info['contentLength']
+                space_consumption += file_info.get('contentLength', file_info['size'])
 
         return space_consumption
 
@@ -321,7 +321,6 @@ class B2Fuse(Operations):
 
         for filename in dirents:
             online_files = [(l[0].file_name, l[0].id_) for l in self.bucket_api.ls()]
-            
             fileName_to_fileId = dict(online_files)
             self.api.delete_file_version(fileName_to_fileId[path], path)
 
@@ -345,7 +344,7 @@ class B2Fuse(Operations):
         #Returns 1 petabyte free space, arbitrary number
         block_size = 4096 * 16
         total_block_count = 1024**4  #1 Petabyte
-        free_block_count = total_block_count - self._get_cloud_space_consumption() / block_size
+        free_block_count = total_block_count - self._get_cloud_space_consumption() // block_size
         return dict(
             f_bsize=block_size,
             f_blocks=total_block_count,
@@ -419,7 +418,7 @@ class B2Fuse(Operations):
         file_info = {}
         file_info['fileName'] = path
 
-        self.open_files[path] = self.B2File(self, file_info, True)  #array.array('c')
+        self.open_files[path] = self.B2File(self, file_info, True)
 
         self.fd += 1
         return self.fd

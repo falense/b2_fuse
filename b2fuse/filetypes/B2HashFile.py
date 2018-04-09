@@ -23,7 +23,7 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-import array
+from ..py2_compat import byte_array
 
 
 from .B2BaseFile import B2BaseFile
@@ -33,7 +33,7 @@ class B2HashFile(B2BaseFile):
         super(B2HashFile, self).__init__(b2fuse, file_info)
 
         file_hash = file_info['contentSha1'] + "\n"
-        self.data = array.array('B', file_hash.encode("utf-8"))
+        self.data = byte_array(file_hash.encode("utf-8"))
 
     #def __getitem__(self, key):
     #    if isinstance(key, slice):

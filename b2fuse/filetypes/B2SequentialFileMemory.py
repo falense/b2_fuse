@@ -23,10 +23,10 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-import array
 
 from b2.download_dest import DownloadDestBytes
 
+from ..py2_compat import byte_array
 from .B2BaseFile import B2BaseFile
 
 
@@ -36,12 +36,12 @@ class B2SequentialFileMemory(B2BaseFile):
         
         self._dirty = False
         if new_file:
-            self.data = array.array('B')
+            self.data = byte_array()
             self._dirty = True
         else:
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
-            self.data = array.array('B', download_dest.get_bytes_written())
+            self.data = byte_array(download_dest.get_bytes_written())
 
     # def __getitem__(self, key):
     #    if isinstance(key, slice):
@@ -77,10 +77,11 @@ class B2SequentialFileMemory(B2BaseFile):
             self.write(offset, data)
 
     def read(self, offset, length):
-        return self.data[offset:offset + length].tostring()
+        return byte_array(self.data[offset:offset + length]).tostring()
 
     def truncate(self, length):
-        self.data = self.data[:length]
+        # Convert back to python2-compatible data type after slicing
+        self.data = byte_array(self.data[:length])
 
     def set_dirty(self, new_value):
         self._dirty = new_value
