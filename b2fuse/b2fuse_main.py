@@ -122,7 +122,7 @@ class B2Fuse(Operations):
             directories.extend(directory.get_directories())
 
             for file_info in directory.get_file_infos():
-                space_consumption += file_info['contentLength']
+                space_consumption += file_info['size']
 
         return space_consumption
 
