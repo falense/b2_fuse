@@ -82,7 +82,7 @@ run_by_root_or_not="$(whoami)"
 if [ "$run_by_root_or_not" = "root" ]
 then
 	echo
-	echo "It is better not mount it as root."
+	echo "It is better not to mount it as root."
 	echo "Press <Enter> to continue or abort with <Ctrl-c>"
 	read not_to_be_used_variable
 fi
@@ -93,7 +93,7 @@ then
 	bucket_name="$1"
 else
 	echo
-	echo "Te buckets configured in this folder ("$script_dir") are:"
+	echo "The buckets configured in this folder ("$script_dir") are:"
 	list_of_config_files="$(ls --quoting-style=shell-always "$script_dir"/config_*_bucket.yaml)"
 	trim_to_get_bucket_names=${list_of_config_files//"$script_dir"\/config_/}
 	echo ${trim_to_get_bucket_names//_bucket.yaml/}
