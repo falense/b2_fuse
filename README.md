@@ -92,6 +92,13 @@ Usage notes:
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
 
+### Testing
+
+Go to the repostiory root directory, create a folder called `mountpoint` and run the test by calling
+```
+python -m "b2fuse.tier1_tests"
+```
+
 ### Application specific notes:
 
 #### Using RSync with B2 Fuse
