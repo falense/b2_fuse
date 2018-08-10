@@ -1,9 +1,10 @@
-from b2fuse import FUSE, load_config, B2Fuse
 
 import unittest
 
 import os
 import shutil
+from fuse import FUSE
+from .b2fuse import load_config, B2Fuse
 
 
 def init_b2fuse():
@@ -12,8 +13,13 @@ def init_b2fuse():
     os.makedirs("mountpoint")
 
     filesystem = B2Fuse(
-        config["accountId"], config["applicationKey"], config["bucketId"],
-        config["enableHashfiles"], config["memoryLimit"], config["tempFolder"], config["useDisk"]
+        config["accountId"],
+        config["applicationKey"],
+        config["bucketId"],
+        config["enableHashfiles"],
+        config["memoryLimit"],
+        config["tempFolder"],
+        config["useDisk"],
     )
 
     fuse = FUSE(filesystem, "mountpoint", nothreads=True, foreground=False)
@@ -22,6 +28,7 @@ def init_b2fuse():
 
 
 class TestCreateFile(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
@@ -38,6 +45,7 @@ class TestCreateFile(unittest.TestCase):
 
 
 class TestDeleteFile(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
         self._file_path = os.path.join(self._mountpoint, "dummy_file_delete")
@@ -48,14 +56,19 @@ class TestDeleteFile(unittest.TestCase):
     def test_delete_file(self):
         os.remove(self._file_path)
 
-        self.assertTrue(not os.path.exists(self._file_path), "File was not deleted")
+        self.assertTrue(
+            not os.path.exists(self._file_path), "File was not deleted"
+        )
 
 
 class TestCreateAndWrite(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
-        self._file_path = os.path.join(self._mountpoint, "dummy_file_createandwrite")
+        self._file_path = os.path.join(
+            self._mountpoint, "dummy_file_createandwrite"
+        )
 
     def tearDown(self):
         os.remove(self._file_path)
@@ -71,14 +84,19 @@ class TestCreateAndWrite(unittest.TestCase):
             read_data = f.read()
             f.close()
 
-        self.assertEqual(data, read_data, "Written data was not the same as read data")
+        self.assertEqual(
+            data, read_data, "Written data was not the same as read data"
+        )
 
 
 class TestCreateAndRandomWrite(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
-        self._file_path = os.path.join(self._mountpoint, "dummy_file_createandrandomwrite")
+        self._file_path = os.path.join(
+            self._mountpoint, "dummy_file_createandrandomwrite"
+        )
 
     def tearDown(self):
         os.remove(self._file_path)
@@ -89,7 +107,7 @@ class TestCreateAndRandomWrite(unittest.TestCase):
         offset = 2
         mask = "ee"
 
-        read_data_orig = data[:offset] + mask + data[offset + len(mask):]
+        read_data_orig = data[:offset] + mask + data[offset + len(mask) :]
 
         f = open(self._file_path, "w")
         f.write(data)
@@ -108,15 +126,24 @@ class TestCreateAndRandomWrite(unittest.TestCase):
 
         print(data, read_data, read_data_orig)
 
-        self.assertEqual(read_data_orig, read_data, "Written data was not the same as read data")
+        self.assertEqual(
+            read_data_orig,
+            read_data,
+            "Written data was not the same as read data",
+        )
 
 
 class TestCreateWriteCopy(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
-        self._file_path = os.path.join(self._mountpoint, "dummy_file_createwritecopy")
-        self._alternate_file_path = os.path.join(self._mountpoint, "dummy_file_createwritecopy2")
+        self._file_path = os.path.join(
+            self._mountpoint, "dummy_file_createwritecopy"
+        )
+        self._alternate_file_path = os.path.join(
+            self._mountpoint, "dummy_file_createwritecopy2"
+        )
 
         self._data = "Hello world"
         f = open(self._file_path, "w")
@@ -138,16 +165,23 @@ class TestCreateWriteCopy(unittest.TestCase):
             f.close()
 
         self.assertEqual(
-            self._data, read_data, "Copied filed did not contain same data as original"
+            self._data,
+            read_data,
+            "Copied filed did not contain same data as original",
         )
 
 
 class TestCreateWriteMove(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
-        self._file_path = os.path.join(self._mountpoint, "dummy_file_createwritemove")
-        self._alternate_file_path = os.path.join(self._mountpoint, "dummy_file_createwritemove2")
+        self._file_path = os.path.join(
+            self._mountpoint, "dummy_file_createwritemove"
+        )
+        self._alternate_file_path = os.path.join(
+            self._mountpoint, "dummy_file_createwritemove2"
+        )
 
         self._data = "Hello world"
         f = open(self._file_path, "w")
@@ -169,11 +203,14 @@ class TestCreateWriteMove(unittest.TestCase):
             f.close()
 
         self.assertEqual(
-            self._data, read_data, "Copied filed did not contain same data as original"
+            self._data,
+            read_data,
+            "Copied filed did not contain same data as original",
         )
 
 
 class TestCreateFolder(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
@@ -190,6 +227,7 @@ class TestCreateFolder(unittest.TestCase):
 
 
 class TestCreateFileInFolder(unittest.TestCase):
+
     def setUp(self):
         self._mountpoint = "mountpoint"
 
@@ -212,5 +250,5 @@ class TestCreateFileInFolder(unittest.TestCase):
         self.assertTrue(os.path.exists(self._file_path), "File was not created")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
