@@ -285,13 +285,17 @@ class B2Fuse(Operations):
 
         #Add hash files
         if self.enable_hashfiles:
-            hashes = map(lambda fn: fn + ".sha1", dirents)
+            hashes = [name + ".sha1" for name in dirents]
             dirents.extend(hashes)
 
         #Add directories
         dirents.extend(['.', '..'])
-        dirents.extend(map(str, self._directories.get_directories(path)))
-
+        dirents.extend(
+            [
+                str(directory) for directory
+                in self._directories.get_directories(path)
+            ]
+        )
         return dirents
 
     def rmdir(self, path):
