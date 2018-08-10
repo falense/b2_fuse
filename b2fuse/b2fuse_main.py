@@ -64,7 +64,7 @@ class B2Fuse(Operations):
             if os.path.exists(self.temp_folder):
                 self.logger.error("Temporary folder exists, exiting")
                 exit(1)
-                
+
             os.makedirs(self.temp_folder)
             self.B2File = B2FileDisk
         else:
@@ -83,7 +83,7 @@ class B2Fuse(Operations):
     def __exit__(self, *args, **kwargs):
         if os.path.exists(self.temp_folder):
             shutil.rmtree(self.temp_folder)
-            
+
         return
 
     # Helper methods
@@ -128,7 +128,15 @@ class B2Fuse(Operations):
 
     def _update_directory_structure(self):
         #Update the directory structure with online files and local directories
-        online_files = [l[0].as_dict() for l in self.bucket_api.ls()]#self.bucket_api.list_file_names()['files']
+        def build_file_info_dict(file_info_object):
+            file_info = file_info_object.as_dict()
+            file_info["contentSha1"] = file_info_object.content_sha1
+            return file_info
+
+        online_files = [
+            build_file_info_dict(file_info_object)
+            for file_info_object, _ in self.bucket_api.ls()
+        ]
         self._directories.update_structure(online_files, self.local_directories)
 
     def _remove_local_file(self, path, delete_online=True):
@@ -184,17 +192,17 @@ class B2Fuse(Operations):
                 st_atime=time(),
                 st_nlink=2
             )
-            
+
         #Check if path is a file
         elif self._exists(path):
             #If file exist return attributes
 
             online_files = [l[0].file_name for l in self.bucket_api.ls()]
-            
+
             if path in online_files:
                 #print "File is in bucket"
                 file_info = self._directories.get_file_info(path)
-                
+
                 seconds_since_jan1_1970 = int(file_info['uploadTimestamp']/1000.)
                 return dict(
                     st_mode=(S_IFREG | 0o777),
