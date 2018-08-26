@@ -23,17 +23,14 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-import array
-
-
-from B2BaseFile import B2BaseFile
+from .B2BaseFile import B2BaseFile
 
 class B2HashFile(B2BaseFile):
     def __init__(self, b2fuse, file_info, new_file=False):
         super(B2HashFile, self).__init__(b2fuse, file_info)
 
         file_hash = file_info['contentSha1'] + "\n"
-        self.data = array.array('c', file_hash.encode("utf-8"))
+        self.data = bytearray(file_hash.encode("utf-8"))
 
     #def __getitem__(self, key):
     #    if isinstance(key, slice):
@@ -53,4 +50,4 @@ class B2HashFile(B2BaseFile):
         return
 
     def read(self, offset, length):
-        return self.data.tostring()
+        return bytes(self.data)

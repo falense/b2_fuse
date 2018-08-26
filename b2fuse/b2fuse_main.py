@@ -36,11 +36,11 @@ from time import time
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.api import B2Api
 
-from filetypes.B2SequentialFileMemory import B2SequentialFileMemory
-from filetypes.B2FileDisk import B2FileDisk
-from filetypes.B2HashFile import B2HashFile
-from directory_structure import DirectoryStructure
-from cached_bucket import CachedBucket
+from .filetypes.B2SequentialFileMemory import B2SequentialFileMemory
+from .filetypes.B2FileDisk import B2FileDisk
+from .filetypes.B2HashFile import B2HashFile
+from .directory_structure import DirectoryStructure
+from .cached_bucket import CachedBucket
 
 
 
@@ -64,7 +64,7 @@ class B2Fuse(Operations):
             if os.path.exists(self.temp_folder):
                 self.logger.error("Temporary folder exists, exiting")
                 exit(1)
-                
+
             os.makedirs(self.temp_folder)
             self.B2File = B2FileDisk
         else:
@@ -83,7 +83,7 @@ class B2Fuse(Operations):
     def __exit__(self, *args, **kwargs):
         if os.path.exists(self.temp_folder):
             shutil.rmtree(self.temp_folder)
-            
+
         return
 
     # Helper methods
@@ -128,7 +128,15 @@ class B2Fuse(Operations):
 
     def _update_directory_structure(self):
         #Update the directory structure with online files and local directories
-        online_files = [l[0].as_dict() for l in self.bucket_api.ls()]#self.bucket_api.list_file_names()['files']
+        def build_file_info_dict(file_info_object):
+            file_info = file_info_object.as_dict()
+            file_info["contentSha1"] = file_info_object.content_sha1
+            return file_info
+
+        online_files = [
+            build_file_info_dict(file_info_object)
+            for file_info_object, _ in self.bucket_api.ls()
+        ]
         self._directories.update_structure(online_files, self.local_directories)
 
     def _remove_local_file(self, path, delete_online=True):
@@ -178,26 +186,26 @@ class B2Fuse(Operations):
         #Check if path is a directory
         if self._directories.is_directory(path):
             return dict(
-                st_mode=(S_IFDIR | 0777),
+                st_mode=(S_IFDIR | 0o777),
                 st_ctime=time(),
                 st_mtime=time(),
                 st_atime=time(),
                 st_nlink=2
             )
-            
+
         #Check if path is a file
         elif self._exists(path):
             #If file exist return attributes
 
             online_files = [l[0].file_name for l in self.bucket_api.ls()]
-            
+
             if path in online_files:
                 #print "File is in bucket"
                 file_info = self._directories.get_file_info(path)
-                
+
                 seconds_since_jan1_1970 = int(file_info['uploadTimestamp']/1000.)
                 return dict(
-                    st_mode=(S_IFREG | 0777),
+                    st_mode=(S_IFREG | 0o777),
                     st_ctime=seconds_since_jan1_1970,
                     st_mtime=seconds_since_jan1_1970,
                     st_atime=seconds_since_jan1_1970,
@@ -208,7 +216,7 @@ class B2Fuse(Operations):
             elif path.endswith(".sha1"):
                 #print "File is just a hash"
                 return dict(
-                    st_mode=(S_IFREG | 0444),
+                    st_mode=(S_IFREG | 0o444),
                     st_ctime=0,
                     st_mtime=0,
                     st_atime=0,
@@ -219,7 +227,7 @@ class B2Fuse(Operations):
             else:
                 #print "File exists only locally"
                 return dict(
-                    st_mode=(S_IFREG | 0777),
+                    st_mode=(S_IFREG | 0o777),
                     st_ctime=0,
                     st_mtime=0,
                     st_atime=0,
@@ -273,17 +281,21 @@ class B2Fuse(Operations):
 
         #If filenames has a prefix (relative to path) remove this
         if len(path) > 0:
-            dirents = map(lambda f: f[len(path) + 1:], dirents)
+            dirents = list(map(lambda f: f[len(path) + 1:], dirents))
 
         #Add hash files
         if self.enable_hashfiles:
-            hashes = map(lambda fn: fn + ".sha1", dirents)
+            hashes = [name + ".sha1" for name in dirents]
             dirents.extend(hashes)
 
         #Add directories
         dirents.extend(['.', '..'])
-        dirents.extend(map(str, self._directories.get_directories(path)))
-
+        dirents.extend(
+            [
+                str(directory) for directory
+                in self._directories.get_directories(path)
+            ]
+        )
         return dirents
 
     def rmdir(self, path):
@@ -321,7 +333,6 @@ class B2Fuse(Operations):
 
         for filename in dirents:
             online_files = [(l[0].file_name, l[0].id_) for l in self.bucket_api.ls()]
-            
             fileName_to_fileId = dict(online_files)
             self.api.delete_file_version(fileName_to_fileId[path], path)
 
@@ -345,7 +356,7 @@ class B2Fuse(Operations):
         #Returns 1 petabyte free space, arbitrary number
         block_size = 4096 * 16
         total_block_count = 1024**4  #1 Petabyte
-        free_block_count = total_block_count - self._get_cloud_space_consumption() / block_size
+        free_block_count = total_block_count - self._get_cloud_space_consumption() // block_size
         return dict(
             f_bsize=block_size,
             f_blocks=total_block_count,
@@ -419,7 +430,7 @@ class B2Fuse(Operations):
         file_info = {}
         file_info['fileName'] = path
 
-        self.open_files[path] = self.B2File(self, file_info, True)  #array.array('c')
+        self.open_files[path] = self.B2File(self, file_info, True)
 
         self.fd += 1
         return self.fd

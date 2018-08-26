@@ -15,10 +15,12 @@ setup(
     classifiers=[
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5  ',
+        'Programming Language :: Python :: 3.6',
     ],
     keywords='',
     author='Sondre Engebraaten',
-    author_email='info@sender.com',
     packages=find_packages(),
     install_requires=['b2==1.1.0', 'fusepy==2.0.4', 'PyYAML==3.12'],
     include_package_data=True,

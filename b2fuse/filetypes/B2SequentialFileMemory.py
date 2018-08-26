@@ -23,11 +23,10 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #SOFTWARE.
 
-import array
 
 from b2.download_dest import DownloadDestBytes
 
-from B2BaseFile import B2BaseFile
+from .B2BaseFile import B2BaseFile
 
 
 class B2SequentialFileMemory(B2BaseFile):
@@ -36,12 +35,12 @@ class B2SequentialFileMemory(B2BaseFile):
         
         self._dirty = False
         if new_file:
-            self.data = array.array('c')
+            self.data = bytearray()
             self._dirty = True
         else:
             download_dest = DownloadDestBytes()
             self.b2fuse.bucket_api.download_file_by_id(self.file_info['fileId'], download_dest)
-            self.data = array.array('c', download_dest.get_bytes_written())
+            self.data = bytearray(download_dest.get_bytes_written())
 
     # def __getitem__(self, key):
     #    if isinstance(key, slice):
@@ -50,7 +49,7 @@ class B2SequentialFileMemory(B2BaseFile):
 
     def upload(self):
         if self._dirty:
-            self.b2fuse.bucket_api.upload_bytes(bytes(self.data.tostring()), self.file_info['fileName'])
+            self.b2fuse.bucket_api.upload_bytes(bytes(self.data), self.file_info['fileName'])
             self.b2fuse._update_directory_structure()
             self.file_info = self.b2fuse._directories.get_file_info(self.file_info['fileName'])
 
@@ -72,12 +71,12 @@ class B2SequentialFileMemory(B2BaseFile):
             for i in range(len(data)):
                 self.data[offset+i] = data[i]
         else:
-			extend_length = offset-len(data)
-			self.data.extend([0 for i in range(extend_length)])
-			self.write(offset, data)
+            extend_length = offset-len(data)
+            self.data.extend([0 for i in range(extend_length)])
+            self.write(offset, data)
 
     def read(self, offset, length):
-        return self.data[offset:offset + length].tostring()
+        return bytes(self.data[offset:offset + length])
 
     def truncate(self, length):
         self.data = self.data[:length]

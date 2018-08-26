@@ -49,7 +49,7 @@ class Directory(object):
         self._content.append(file_info)
 
     def get_file_info(self, name):
-        file_info = filter(lambda f: str(f['fileName']) == name, self._content)
+        file_info = list(filter(lambda f: str(f['fileName']) == name, self._content))
 
         if len(file_info) == 1:
             return file_info[0]

@@ -29,7 +29,7 @@ import yaml
 
 from fuse import FUSE
 
-from b2fuse_main import B2Fuse
+from .b2fuse_main import B2Fuse
 
 
 def create_parser():

@@ -28,7 +28,7 @@ import os.path
 
 from b2.download_dest import DownloadDestBytes
 
-from B2BaseFile import B2BaseFile
+from .B2BaseFile import B2BaseFile
 
 
 class B2FileDisk(B2BaseFile):
@@ -46,7 +46,7 @@ class B2FileDisk(B2BaseFile):
         if os.path.exists(self.temp_filename):
             os.remove(self.temp_filename)
 
-        self.temp_file = open(self.temp_filename, "wr+b")
+        self.temp_file = open(self.temp_filename, "r+b")
 
         if new_file:
             self._dirty = True

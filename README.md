@@ -13,6 +13,8 @@
 
 Requires YAML and FUSE for python to work (this is not the same as "python-fuse" package). 
 
+#### Python2 setup
+
 Install YAML for python as follows: 
 
 ```
@@ -35,9 +37,27 @@ If the above does not work (a possibility on Python 2.7), you can also install F
 
 
 ```
-sudo python -m pip install fusepy
-sudo python -m pip install b2
+sudo python -m pip install fusepy b2
 ```
+
+#### Python3 setup
+
+
+Install dependencies for Python3 as follows: 
+
+
+```
+sudo python -m pip install fusepy b2 pyyaml
+```
+
+Install B2Fuse itself for Python3: 
+
+
+```
+sudo python setup.py install
+```
+
+#### Configuration and usage
 
 You will need a `config.yaml` file in the folder where you run the fuse driver.
 An example config ("config.yaml"):
@@ -91,6 +111,13 @@ Usage notes:
 * Neither permissions or timestamps are supported by B2. B2_fuse ignores any requests to set permissions.
 * Filesystem contains ".sha1" files, these are undeletable and contain the hash of the file without the postfix. This feature can be disabled by setting variable "enable_hashfiles" to False.
 * For optimal performance and throughput, you should store a few large files. Small files suffer from latency issues due to the way B2 API is implemented. Large files will allow you to saturate your internet connection.
+
+### Testing
+
+Go to the repostiory root directory, create a folder called `mountpoint` and run the test by calling
+```
+python -m "b2fuse.tier1_tests"
+```
 
 ### Application specific notes:
 
